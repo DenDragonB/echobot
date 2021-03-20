@@ -87,7 +87,9 @@ whatUpdate htg users com (TGUpMessge {..}) = do
                         todo htg users newCom $ succ tgUpdateId
         "/help"   -> do sendHelp htg tgMessage
                         todo htg users com $ succ tgUpdateId
-        "/stop"   -> return ()
+        "/stop"   -> do Logger.info (hLogger htg) $ "The bot was stopped by user "
+                                         ++ (tgUserName $ tgMessageFrom tgMessage)
+                        return ()
         _         -> if com && tgMessageText tgMessage `elem` ["1","2","3","4","5"] 
                          then do newUsers <- setRepeat htg users tgMessage
                                  todo htg newUsers False $ succ tgUpdateId

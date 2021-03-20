@@ -2,7 +2,6 @@
 
 module Main where
 
-import qualified Data.Configurator as C
 import qualified Data.Text as T
 import qualified Data.Aeson as Aeson
 import qualified Text.Toml as TOML

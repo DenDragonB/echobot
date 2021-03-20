@@ -24,10 +24,10 @@ dependencies:
 - aeson
 - bytestring
 - utf8-string
-- configurator
 - htoml
 - text
 - http-conduit
+- time
 
 library:
   source-dirs: src

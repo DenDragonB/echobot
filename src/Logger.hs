@@ -22,6 +22,7 @@ import           Prelude hiding (log, error)
 import qualified System.IO as IO (IOMode (..),FilePath,withFile,hPutStrLn,stderr)
 import qualified Data.Aeson as A
 import qualified Data.Text as T
+import           Data.Time.Clock 
 
 data LogLevel 
     = Debug
@@ -56,10 +57,17 @@ data Config = Config
     }
     deriving (Show)
 instance A.FromJSON Config where
-    parseJSON = A.withObject "FromJSON Logger.Config" $ \o -> Config
-        <$> o A..:  "logTo"   
-        <*> o A..:? "logPath" A..!= "log.log"
-        <*> o A..:  "logMinLevel" 
+    parseJSON (A.Object config) = do
+        Just logTo    <- config A..: "logTo"
+        Just logLevel <- config A..: "logMinLevel"
+        Just logPath  <- config A..: "logPath"
+        let cLogPath = case logPath of
+                          "" -> "log.txt"
+                          _  -> logPath
+        return Config { logTo       = logTo
+                      , logPath     = cLogPath
+                      , logMinLevel = logLevel
+                      }
 
 data Handle = Handle 
     { hConfig :: Config  }
@@ -72,7 +80,9 @@ withHandle config f = f $ Handle config
 -- Output log string to file
 logToFile :: Config -> LogLevel -> String -> IO ()
 logToFile Config {..} lvl str = IO.withFile logPath IO.AppendMode 
-    (\ hdl -> IO.hPutStrLn hdl $ show lvl ++ ": " ++ str)
+    (\ hdl -> do
+        time <- getCurrentTime
+        IO.hPutStrLn hdl $ show time ++ " - " ++ show lvl ++ ": " ++ str)
 
 -- Output log string to stderr
 logToConsole :: LogLevel -> String -> IO ()
@@ -90,13 +100,6 @@ debug   h = log h Debug
 info    h = log h Info
 warning h = log h Warning
 error   h = log h Error
-
--- Нужно реализовать:
--- 1. Создание директории Log
--- 2. Открытие существующего файла или создание нового файла log
--- 5. Конфигурирование
--- 6. Форматирование строки лога
--- 7. Файл должен быть в каталоге программы, а не в месте запуска
 
 configTest = Config 
     { logTo = LogToFile
