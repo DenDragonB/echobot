@@ -11,23 +11,27 @@ import qualified Bot as Bot
 import           Bot.TGLib
 
 data Config = Config
-    {token :: String}
+    { token   :: String
+    , timeout :: Integer
+    }
     deriving Show
 instance A.FromJSON Config where
     parseJSON = A.withObject "FromJSON BotTelegram.Config" $ \o -> Config
         <$> o A..: "token"
+        <$> o A..: "timeout"
 
 data Handle = Handle
-    { hConfig :: Config
-    , hBot    :: Bot.Handle
-    , hLogger :: Logger.Handle
+    { hConfig  :: Config
+    , hBot     :: Bot.Handle
+    , hLogger  :: Logger.Handle
+    , command  :: Bool
+    , offset   :: Integer
+    , response :: Maybe TGResponse
     }
     deriving Show
 
-type Users = [Bot.User]
-
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
-withHandle hLog hBot conf f = f $ Handle conf hBot hLog
+withHandle hLog hBot conf f = f $ Handle conf hBot hLog False 0
 
 sendHelp :: Handle -> TGMessage -> IO ()
 sendHelp (Handle {..}) (TGMessage {..}) = do
@@ -97,8 +101,38 @@ whatUpdate htg users com (TGUpMessge {..}) = do
                                  todo htg users com $ succ tgUpdateId
 whatUpdate htg users com update = todo htg users com $ succ $ tgUpdateId update
 
-todo :: Handle -> Users -> Bool -> Integer -> IO ()
-todo htg users com offset = do
+sendHelp :: Monad m => Handle -> m Handle
+sendHelp handle@Handle {..} = do
+    case response of
+        -- There are no or bad response from api
+        Nothing -> return handle
+        Just resp -> do
+            let updates = filter (tgUpType == UPMessage) responseResult resp
+            let needHelp = filter (tgMessageText tgMessage == "/help") updates
+            case null resHelp of
+                True -> return Handle
+                False -> do
+                    sender
+
+
+getResponseFromAPI
+        (token hConfig) 
+        (tgSendMessage 
+            (tgChatId tgMessageChat)
+            (Bot.helpText $ Bot.hConfig hBot))
+    Logger.info hLogger "Help text sent"
+
+getUpdates :: Monad m => Handle -> m Handle
+getUpdates handle@Handle {..} = do
+    json <- getResponseFromAPI (token hConfig) $ getUpdates (timeout hConfig) offset
+    Logger.debug hLogger $ show json
+    return handle {response = A.decodeStrict json}
+
+todo :: Handle -> IO Handle
+todo handle = 
+    return handle >>=
+    getUpdates >>=
+    sendHelp
     json <- getResponseFromAPI (token $ hConfig htg) $ tgGetUpdates 60 offset
     Logger.debug (hLogger htg) $ show json
     let Just resp = A.decodeStrict json

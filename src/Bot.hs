@@ -25,6 +25,7 @@ instance A.FromJSON Config where
 
 data Handle = Handle
     { hConfig :: Config
+      users :: [User]
     }
     deriving Show
 
@@ -57,4 +58,6 @@ configTest = Config
     , repeatDefault = 1
     }
 handleTest = Handle
-    { hConfig = configTest }
+    { hConfig = configTest
+    , users = [] 
+    }
