@@ -3,7 +3,7 @@
 module Bot where
 
 import qualified Data.Aeson as A
-import qualified Logger as Logger
+import qualified Logger
 
 type Token = String
 
@@ -25,7 +25,7 @@ instance A.FromJSON Config where
 
 data Handle = Handle
     { hConfig :: Config
-      users :: [User]
+    ,  users :: [User]
     }
     deriving Show
 
@@ -34,13 +34,29 @@ type UName = String
 type UID   = Integer
 type URep  = Int
 data User  = User
-    { uName :: UName
-    , uID   :: UID
-    , uRep  :: URep
+    { uName   :: UName
+    , uID     :: UID
+    , uRep    :: URep
+    , uSentRep :: Bool
     }
+    deriving Show
 
 withHandle :: Config -> (Handle -> IO ()) -> IO ()
-withHandle conf f = f $ Handle conf
+withHandle conf f = f $ Handle conf []
+
+setCommand :: [User] -> User -> [User]
+setCommand [] newUser = [User { uName    = uName newUser
+                                  , uID      = uID newUser
+                                  , uRep     = uRep newUser
+                                  , uSentRep = uSentRep newUser
+                                  } ]
+setCommand (u:us) newUser
+    | uID u == uID newUser = User { uName    = uName newUser
+                                  , uID      = uID newUser
+                                  , uRep     = uRep u
+                                  , uSentRep = uSentRep newUser
+                                  } : us
+    | otherwise = u : putRepeat us newUser 
 
 putRepeat :: [User] -> User -> [User]
 putRepeat [] newUser = [newUser]

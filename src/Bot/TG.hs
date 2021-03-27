@@ -33,34 +33,6 @@ data Handle = Handle
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
 withHandle hLog hBot conf f = f $ Handle conf hBot hLog False 0
 
-sendHelp :: Handle -> TGMessage -> IO ()
-sendHelp (Handle {..}) (TGMessage {..}) = do
-    getResponseFromAPI
-        (token hConfig) 
-        (tgSendMessage 
-            (tgChatId tgMessageChat)
-            (Bot.helpText $ Bot.hConfig hBot))
-    Logger.info hLogger "Help text sent"
-
-sendRepeat :: Handle -> Users -> TGMessage -> IO Bool
-sendRepeat (Handle {..}) users (TGMessage {..}) = do
-    getResponseFromAPI
-        (token hConfig) 
-        (tgSendButtons 
-            (tgChatId tgMessageChat)
-            (
-                (Bot.repeatText1 $ Bot.hConfig hBot)
-                ++ (show $ Bot.repeatDefault $ Bot.hConfig hBot) ++ "\r\n"
-                ++ (Bot.repeatText2 $ Bot.hConfig hBot)
-            )
-            (TGKeyBoard 
-                [[TGButton "1",TGButton "2",TGButton "3",TGButton "4",TGButton "5"]]
-                True
-                True
-                False))
-    Logger.info hLogger "Repeat command sent"
-    return True
-
 setRepeat :: Handle -> Users -> TGMessage -> IO Users
 setRepeat (Handle {..}) users (TGMessage {..}) = do
     let newUser = Bot.User 
@@ -101,6 +73,20 @@ whatUpdate htg users com (TGUpMessge {..}) = do
                                  todo htg users com $ succ tgUpdateId
 whatUpdate htg users com update = todo htg users com $ succ $ tgUpdateId update
 
+sendRepeat :: Monad m => Handle -> m Handle
+sendRepeat handle@Handle {..} = do
+    case response of
+        -- There are no or bad response from api
+        Nothing -> return handle
+        Just resp -> do
+            let updates = filter (tgUpType == UPMessage) responseResult resp
+            let needHelp = filter (tgMessageText tgMessage == "/repeat") updates
+            let repeatMessage = Bot.repeatText1 $ Bot.hConfig hBot
+                                ++ show $ Bot.repeatDefault $ Bot.hConfig hBot ++ "\r\n"
+                                ++ Bot.repeatText2 $ Bot.hConfig hBot
+            foldM (senderKB repeatMessage "REPEAT") handle needHelp
+
+
 sendHelp :: Monad m => Handle -> m Handle
 sendHelp handle@Handle {..} = do
     case response of
@@ -109,18 +95,9 @@ sendHelp handle@Handle {..} = do
         Just resp -> do
             let updates = filter (tgUpType == UPMessage) responseResult resp
             let needHelp = filter (tgMessageText tgMessage == "/help") updates
-            case null resHelp of
-                True -> return Handle
-                False -> do
-                    sender
+            let helpMessage = Bot.helpText $ Bot.hConfig hBot
+            foldM (sender helpMessage "HELP") handle needHelp
 
-
-getResponseFromAPI
-        (token hConfig) 
-        (tgSendMessage 
-            (tgChatId tgMessageChat)
-            (Bot.helpText $ Bot.hConfig hBot))
-    Logger.info hLogger "Help text sent"
 
 getUpdates :: Monad m => Handle -> m Handle
 getUpdates handle@Handle {..} = do
@@ -128,17 +105,43 @@ getUpdates handle@Handle {..} = do
     Logger.debug hLogger $ show json
     return handle {response = A.decodeStrict json}
 
+sender :: Monad m => String -> Handle -> TGMessage -> m Handle
+sender textMes textLog handle@Handle {..} TGMessage {..} = do
+    getResponseFromAPI
+        (token hConfig) 
+        (tgSendMessage 
+            (tgChatId tgMessageChat)
+            textMes)
+    Logger.info hLogger $ "Sent message " ++ textLog ++ " to " ++ tgUserName tgMessageFrom
+    return handle
+
+senderKB :: Monad m => String -> Handle -> TGMessage -> m Handle
+senderKB textMes textLog handle@Handle {..} TGMessage {..} = do
+    getResponseFromAPI
+        (token hConfig) 
+        (tgSendButtons 
+            (tgChatId tgMessageChat)
+            textMes
+            (TGKeyBoard 
+                [[TGButton "1",TGButton "2",TGButton "3",TGButton "4",TGButton "5"]]
+                True
+                True
+                False))
+    Logger.info hLogger $ "Sent message " ++ textLog ++ " to " ++ tgUserName tgMessageFrom
+    let user = Bot.User { uName = tgUserName tgMessageFrom
+                        , uID = tgUserName tgMessageFrom
+                        , uRep = Bot.repeatDefault $ Bot.hConfig hBot
+                        , uSentRep = True}
+    let newHandle = handle {hBot = hBot {Bot.users = setCommand (Bot.users hBot) user}}
+    Logger.debug hLogger $ "Set command REPEAT to " ++ tgUserName tgMessageFrom
+    return newHandle
+
 todo :: Handle -> IO Handle
 todo handle = 
-    return handle >>=
-    getUpdates >>=
-    sendHelp
-    json <- getResponseFromAPI (token $ hConfig htg) $ tgGetUpdates 60 offset
-    Logger.debug (hLogger htg) $ show json
-    let Just resp = A.decodeStrict json
-    case responseResult resp of
-        [] -> todo htg users com offset
-        _  -> mapM_ (whatUpdate htg users com) $ responseResult resp
+    getUpdates handle >>=
+    sendHelp >>=
+    sendRepeat >>=
+    todo
 
 configTest = Config { token = "1601854063:AAHSq7CxULiYMUyHiSiwS1ByOVA-kUg_ejU" }
 handleTest = Handle
