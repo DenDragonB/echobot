@@ -34,9 +34,9 @@ type UName = String
 type UID   = Integer
 type URep  = Int
 data User  = User
-    { uName   :: UName
-    , uID     :: UID
-    , uRep    :: URep
+    { uName    :: UName
+    , uID      :: UID
+    , uRep     :: URep
     , uSentRep :: Bool
     }
     deriving Show
@@ -57,6 +57,11 @@ setCommand (u:us) newUser
                                   , uSentRep = uSentRep newUser
                                   } : us
     | otherwise = u : putRepeat us newUser 
+
+getCommand :: [User] -> UID -> Bool
+getCommand [] _      = False
+getCommand (u:us) id | uID u == id = uSentRep u
+                     | otherwise   = getCommand us id
 
 putRepeat :: [User] -> User -> [User]
 putRepeat [] newUser = [newUser]

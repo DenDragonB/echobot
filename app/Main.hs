@@ -42,4 +42,5 @@ main = do
                 "vk" -> Logger.info logger "Запускаем ВК"
                 _    -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
                             Logger.debug logger $ show handle
-                            TG.todo handle [] False 0
+                            newHandle <- TG.todo handle
+                            return ()

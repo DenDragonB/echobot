@@ -5,9 +5,10 @@ module Bot.TG where
 
 import qualified Data.ByteString.UTF8 as BS
 import qualified Data.Aeson as A
+import           Control.Monad (foldM,replicateM_)
 
-import qualified Logger as Logger
-import qualified Bot as Bot
+import qualified Logger
+import qualified Bot
 import           Bot.TGLib
 
 data Config = Config
@@ -18,134 +19,175 @@ data Config = Config
 instance A.FromJSON Config where
     parseJSON = A.withObject "FromJSON BotTelegram.Config" $ \o -> Config
         <$> o A..: "token"
-        <$> o A..: "timeout"
+        <*> o A..: "timeout"
 
 data Handle = Handle
     { hConfig  :: Config
     , hBot     :: Bot.Handle
     , hLogger  :: Logger.Handle
-    , command  :: Bool
     , offset   :: Integer
     , response :: Maybe TGResponse
     }
     deriving Show
 
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
-withHandle hLog hBot conf f = f $ Handle conf hBot hLog False 0
+withHandle hLog hBot conf f = f $ Handle conf hBot hLog 0 Nothing
 
-setRepeat :: Handle -> Users -> TGMessage -> IO Users
-setRepeat (Handle {..}) users (TGMessage {..}) = do
-    let newUser = Bot.User 
-                      { Bot.uName = tgUserName tgMessageFrom
-                      , Bot.uID   = tgUserId tgMessageFrom
-                      , Bot.uRep  = read tgMessageText
-                      }
-    Logger.info hLogger $ "Setting the number of repetitions for the user " ++ Bot.uName newUser
-    return $ Bot.putRepeat users newUser 
+--copyMessage :: Monad m => Handle -> m Handle
+copyMessage :: Handle -> IO Handle
+copyMessage handle@Handle {..} = do
+    case response of
+        -- There are no or bad response from api
+        Nothing -> return handle
+        Just resp -> do
+            let updates = filter (\u -> tgUpType u == UPMessage) $ responseResult resp
+            foldM (sender 0 "" "ECHO") handle updates
 
-copyMessage :: Handle -> Users -> TGMessage -> IO ()
-copyMessage (Handle {..}) users (TGMessage {..}) = do
-    let rep = Bot.getRepeat users (Bot.repeatDefault $ Bot.hConfig hBot) (tgUserId tgMessageFrom)
-    let ms = take rep $ repeat $ tgCopyMessage (tgChatId tgMessageChat)
-                                               (tgChatId tgMessageChat)
-                                                tgMessageId
-    mapM_ (getResponseFromAPI (token hConfig)) ms
-    Logger.info hLogger "Echo sent"
+--setRepeat :: Monad m => Handle -> m Handle
+setRepeat :: Handle -> IO Handle
+setRepeat handle@Handle {..} = do
+    case response of
+        -- There are no or bad response from api
+        Nothing -> return handle
+        Just resp -> do
+            let updates = filter (\u -> tgUpType u == UPMessage) $ responseResult resp
+            let needSet = filter 
+                    (\u -> tgMessageText (tgMessage u) `elem` ["1","2","3","4","5"] &&
+                        Bot.getCommand (Bot.users hBot)
+                                       (tgUserId $ tgMessageFrom $ tgMessage u)) updates
+            foldM setter handle needSet 
 
-whatUpdate :: Handle -> Users -> Bool -> TGUpdate -> IO ()
-whatUpdate htg users com (TGUpMessge {..}) = do
-    Logger.info (hLogger htg) ("Received a message from the user "
-        ++ (tgUserName $ tgMessageFrom tgMessage)
-        ++ " (id:" ++ (show $ tgUserId $tgMessageFrom tgMessage)
-        ++ ")")
-    case tgMessageText tgMessage of
-        "/repeat" -> do newCom <- sendRepeat htg users tgMessage
-                        todo htg users newCom $ succ tgUpdateId
-        "/help"   -> do sendHelp htg tgMessage
-                        todo htg users com $ succ tgUpdateId
-        "/stop"   -> do Logger.info (hLogger htg) $ "The bot was stopped by user "
-                                         ++ (tgUserName $ tgMessageFrom tgMessage)
-                        return ()
-        _         -> if com && tgMessageText tgMessage `elem` ["1","2","3","4","5"] 
-                         then do newUsers <- setRepeat htg users tgMessage
-                                 todo htg newUsers False $ succ tgUpdateId
-                         else do copyMessage htg users tgMessage 
-                                 todo htg users com $ succ tgUpdateId
-whatUpdate htg users com update = todo htg users com $ succ $ tgUpdateId update
+--setter :: Monad m => Handle -> TGUpdate -> m Handle
+setter :: Handle -> TGUpdate -> IO Handle
+setter handle@Handle {..} TGUpMessge {..} = do
+    let newUsers = Bot.putRepeat (Bot.users hBot) 
+                                 (Bot.User { uName = tgUserName $ tgMessageFrom tgMessage
+                                           , uID = tgUserId $ tgMessageFrom tgMessage
+                                           , uRep = read $ tgMessageText tgMessage
+                                           , uSentRep = False })
+    Logger.debug hLogger $ show newUsers
+    let newBot = hBot {Bot.users = newUsers}
+    let newHUsers = handle {hBot = newBot}
+    Logger.info hLogger $ "Set repeat for " ++ tgUserName (tgMessageFrom tgMessage) ++
+                          " to " ++ read (tgMessageText tgMessage)
+    let newHandle = delUpdate newHUsers tgUpdateId
+    return newHandle
 
-sendRepeat :: Monad m => Handle -> m Handle
+--sendRepeat :: Monad m => Handle -> m Handle
+sendRepeat :: Handle -> IO Handle
 sendRepeat handle@Handle {..} = do
     case response of
         -- There are no or bad response from api
         Nothing -> return handle
         Just resp -> do
-            let updates = filter (tgUpType == UPMessage) responseResult resp
-            let needHelp = filter (tgMessageText tgMessage == "/repeat") updates
-            let repeatMessage = Bot.repeatText1 $ Bot.hConfig hBot
-                                ++ show $ Bot.repeatDefault $ Bot.hConfig hBot ++ "\r\n"
-                                ++ Bot.repeatText2 $ Bot.hConfig hBot
-            foldM (senderKB repeatMessage "REPEAT") handle needHelp
+            let updates = filter (\u -> tgUpType u == UPMessage) $ responseResult resp
+            let needHelp = filter (\u -> tgMessageText (tgMessage u) == "/repeat") updates
+            foldM (senderKB "REPEAT") handle needHelp
 
-
-sendHelp :: Monad m => Handle -> m Handle
+-- sendHelp :: Monad m => Handle -> m Handle
+sendHelp :: Handle -> IO Handle
 sendHelp handle@Handle {..} = do
     case response of
         -- There are no or bad response from api
         Nothing -> return handle
         Just resp -> do
-            let updates = filter (tgUpType == UPMessage) responseResult resp
-            let needHelp = filter (tgMessageText tgMessage == "/help") updates
+            let updates = filter (\u -> tgUpType u == UPMessage) $ responseResult resp
+            let needHelp = filter (\u -> tgMessageText (tgMessage u) == "/help") updates
             let helpMessage = Bot.helpText $ Bot.hConfig hBot
-            foldM (sender helpMessage "HELP") handle needHelp
+            foldM (sender 1 helpMessage "HELP") handle needHelp
 
+delUpdate :: Handle -> Integer -> Handle
+delUpdate handle@Handle {..} id = handle {response = newResp} where
+    newResp = case response of
+        -- There are no or bad response from api
+        Nothing -> response
+        Just resp -> let
+            updates = filter (\u -> tgUpType u == UPMessage) $ responseResult resp
+            newUpdate = filter (\u -> tgUpdateId u /= id) updates
+            in Just resp {responseResult = newUpdate}
 
-getUpdates :: Monad m => Handle -> m Handle
-getUpdates handle@Handle {..} = do
-    json <- getResponseFromAPI (token hConfig) $ getUpdates (timeout hConfig) offset
+--getUpdates :: Monad m => Handle -> m Handle
+getResponse :: Handle -> IO Handle
+getResponse handle@Handle {..} = do
+    json <- getResponseFromAPI (token hConfig) $ tgGetUpdates (timeout hConfig) offset
     Logger.debug hLogger $ show json
-    return handle {response = A.decodeStrict json}
+    let response = A.decodeStrict json
+    case response of
+        Nothing   -> return handle { response = Nothing }
+        Just resp -> do
+            case responseResult resp of
+                [] -> return handle { response = response }
+                ups -> do
+                    let offset = 1 + tgUpdateId (last ups)
+                    return handle { response = response 
+                                  , offset = offset}
 
-sender :: Monad m => String -> Handle -> TGMessage -> m Handle
-sender textMes textLog handle@Handle {..} TGMessage {..} = do
-    getResponseFromAPI
-        (token hConfig) 
-        (tgSendMessage 
-            (tgChatId tgMessageChat)
-            textMes)
-    Logger.info hLogger $ "Sent message " ++ textLog ++ " to " ++ tgUserName tgMessageFrom
-    return handle
+--sender :: Monad m => String -> String -> Handle -> TGUpdate -> m Handle
+sender :: Int -> String -> String -> Handle -> TGUpdate -> IO Handle
+sender rep textMes textLog handle@Handle {..} TGUpMessge {..} = do
+    let repeats = case rep of
+                    1 -> rep
+                    0 -> Bot.getRepeat
+                            (Bot.users hBot)
+                            (Bot.repeatDefault $ Bot.hConfig hBot)
+                            (tgUserId $ tgMessageFrom tgMessage) 
+    let msg = case textMes of
+                "" -> tgMessageText tgMessage
+                _  -> textMes
+    replicateM_ repeats $  getResponseFromAPI
+                (token hConfig) 
+                (tgSendMessage 
+                    (tgChatId $ tgMessageChat tgMessage)
+                    msg)
+    Logger.info hLogger $ "Sent message " ++ textLog ++ 
+                          " to " ++ tgUserName (tgMessageFrom tgMessage) ++
+                          " " ++ show repeats ++ " times"
+    let newHandle = delUpdate handle tgUpdateId
+    return newHandle
 
-senderKB :: Monad m => String -> Handle -> TGMessage -> m Handle
-senderKB textMes textLog handle@Handle {..} TGMessage {..} = do
+--senderKB :: Monad m => String -> String -> Handle -> TGUpdate -> m Handle
+senderKB :: String -> Handle -> TGUpdate -> IO Handle
+senderKB textLog handle@Handle {..} TGUpMessge {..} = do
+    let textMes = Bot.repeatText1 (Bot.hConfig hBot)
+                    ++ show (Bot.getRepeat 
+                                (Bot.users hBot)
+                                (Bot.repeatDefault $ Bot.hConfig hBot)
+                                (tgUserId $ tgMessageFrom tgMessage)) ++ "\r\n"
+                    ++ Bot.repeatText2 (Bot.hConfig hBot)
     getResponseFromAPI
         (token hConfig) 
         (tgSendButtons 
-            (tgChatId tgMessageChat)
+            (tgChatId $ tgMessageChat tgMessage)
             textMes
             (TGKeyBoard 
                 [[TGButton "1",TGButton "2",TGButton "3",TGButton "4",TGButton "5"]]
                 True
                 True
                 False))
-    Logger.info hLogger $ "Sent message " ++ textLog ++ " to " ++ tgUserName tgMessageFrom
-    let user = Bot.User { uName = tgUserName tgMessageFrom
-                        , uID = tgUserName tgMessageFrom
+    Logger.info hLogger $ "Sent message " ++ textLog ++ " to " ++ tgUserName (tgMessageFrom tgMessage)
+    let user = Bot.User { uName = tgUserName $ tgMessageFrom tgMessage
+                        , uID = tgUserId $ tgMessageFrom tgMessage
                         , uRep = Bot.repeatDefault $ Bot.hConfig hBot
                         , uSentRep = True}
-    let newHandle = handle {hBot = hBot {Bot.users = setCommand (Bot.users hBot) user}}
-    Logger.debug hLogger $ "Set command REPEAT to " ++ tgUserName tgMessageFrom
-    return newHandle
+    let newHandle = handle {hBot = hBot {Bot.users = Bot.setCommand (Bot.users hBot) user}}
+    return $ delUpdate newHandle tgUpdateId
 
 todo :: Handle -> IO Handle
 todo handle = 
-    getUpdates handle >>=
+    getResponse handle >>=
     sendHelp >>=
     sendRepeat >>=
+    setRepeat >>=
+    copyMessage >>=
     todo
 
-configTest = Config { token = "1601854063:AAHSq7CxULiYMUyHiSiwS1ByOVA-kUg_ejU" }
+configTest = Config { token = "" 
+                    , timeout = 60
+                    }
 handleTest = Handle
     { hConfig = configTest
     , hBot = Bot.handleTest
     , hLogger = Logger.handleTest
+    , offset = 0
+    , response = Nothing
     }
