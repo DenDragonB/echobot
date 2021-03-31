@@ -1,8 +1,34 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Bot.VKLib where
 
 import           Data.Aeson
+import qualified Network.HTTP.Simple as HTTP
+import qualified Data.ByteString.UTF8 as BS
+--import qualified Data.ByteString.Lazy as BSLazy (toStrict)
+
+data LongPollServer = LPServer 
+    { sAddres :: String
+    , key     :: String
+    , ts      :: String}
+instance FromJSON Config where
+    parseJSON = withObject "FromJSON VKLib.LPServer" $ \o -> LPServer
+        <$> o .: "server"
+        <*> o .: "key"
+        <*> o .: "ts"
+
+data Config = Config
+    { token     :: String
+    , groupVKId :: Integer
+    , timeout   :: Integer
+    }
+    deriving Show
+instance FromJSON Config where
+    parseJSON = withObject "FromJSON VKLib.Config" $ \o -> Config
+        <$> o .: "token"
+        <*> o .: "groupId"
+        <*> o .: "timeout"
 
 data Response = Response { ts      :: String     -- number of last events
                          , updates :: [Update]  -- new events
@@ -150,3 +176,36 @@ data Gift = Gift { giftId :: Integer }
 instance FromJSON Gift where
     parseJSON = withObject "FromJSON VKLib.Gift" $ \o -> Gift
         <$> o .: "id"   
+
+-- Types for creating requests
+data ReqSet = ReqSet {method :: String, reqParams :: [(BS.ByteString,Maybe BS.ByteString)]}
+
+getResponseFromAPI :: ReqSet -> IO BS.ByteString
+getResponseFromAPI settings = do
+    let request
+            = HTTP.setRequestMethod (BS.fromString "GET")
+            $ HTTP.setRequestHost   (BS.fromString "api.vk.com")
+            $ HTTP.setRequestPort   (443)
+            $ HTTP.setRequestSecure (True)
+            $ HTTP.setRequestPath   (BS.fromString $ "/method/" ++ method settings)
+            $ HTTP.setRequestQueryString (reqParams settings)
+            $ HTTP.defaultRequest
+    res <- HTTP.httpBS request
+    return (HTTP.getResponseBody res)
+
+getUpdates :: LongPollServer -> Integer -> Integer -> IO BS.ByteString
+getUpdates server wait ts = do 
+    request <- HTTP.parseRequest $ 
+        sAddres server ++ "?act=a_check&key=" ++ key server ++ 
+        "&ts=" ++ show ts ++ "&wait=" ++ show wait
+    res <- HTTP.httpBS request
+    return (HTTP.getResponseBody res)
+
+-- Methods of Telegram API
+getServer :: Config -> ReqSet
+getServer Config {..} = ReqSet {method = "groups.getLongPollServer",
+    reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupVKId)
+                , (BS.fromString "access_token", Just $ BS.fromString token)
+                , (BS.fromString "v",  Just $ BS.fromString "5.130")
+                ] }
+

@@ -9,6 +9,9 @@ import qualified Text.Toml as TOML
 import qualified Logger as Logger
 import qualified Bot as Bot
 import qualified Bot.TG as TG
+import qualified Bot.VK as VK
+import qualified Bot.VKLib as VKLib
+
 --import qualified Bot.VK as VK
 
 data Config = Config
@@ -16,7 +19,7 @@ data Config = Config
     , startOn :: String
     , cBot    :: Bot.Config
     , cBotTG  :: TG.Config
---    , cBotVK  :: VK.Config
+    , cBotVK  :: VKLib.Config
     }
     deriving Show
 instance Aeson.FromJSON Config where
@@ -25,6 +28,7 @@ instance Aeson.FromJSON Config where
         <*> o Aeson..: "startOn"
         <*> o Aeson..: "user"
         <*> o Aeson..: "telegram" 
+        <*> o Aeson..: "vk"
 
 
 main :: IO ()
@@ -39,7 +43,10 @@ main = do
     Logger.withHandle (cLogger conf) $ \logger ->
         Bot.withHandle (cBot conf) $ \bot ->
             case startOn conf of
-                "vk" -> Logger.info logger "Запускаем ВК"
+                "vk" -> VK.withHandle logger bot (cBotVK conf) $ \handle -> do
+                            Logger.debug logger $ show handle
+                            newHandle <- TG.todo handle
+                            return ()
                 _    -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
                             Logger.debug logger $ show handle
                             newHandle <- TG.todo handle
