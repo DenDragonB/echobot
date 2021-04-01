@@ -8,11 +8,17 @@ import qualified Network.HTTP.Simple as HTTP
 import qualified Data.ByteString.UTF8 as BS
 --import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 
+newtype RespServer = RespServer {getResp :: LongPollServer} deriving Show
+instance FromJSON RespServer where
+    parseJSON = withObject "FromJSON VKLib.Response" $ \o -> RespServer
+        <$> o .: "response"
+
 data LongPollServer = LPServer 
     { sAddres :: String
     , key     :: String
-    , ts      :: String}
-instance FromJSON Config where
+    , startTs :: String
+    } deriving Show
+instance FromJSON LongPollServer where
     parseJSON = withObject "FromJSON VKLib.LPServer" $ \o -> LPServer
         <$> o .: "server"
         <*> o .: "key"
@@ -22,8 +28,7 @@ data Config = Config
     { token     :: String
     , groupVKId :: Integer
     , timeout   :: Integer
-    }
-    deriving Show
+    } deriving Show
 instance FromJSON Config where
     parseJSON = withObject "FromJSON VKLib.Config" $ \o -> Config
         <$> o .: "token"
@@ -32,7 +37,7 @@ instance FromJSON Config where
 
 data Response = Response { ts      :: String     -- number of last events
                          , updates :: [Update]  -- new events
-                         }
+                         } deriving Show
 instance FromJSON Response where
     parseJSON = withObject "FromJSON VKLib.Response" $ \o -> Response
         <$> o .: "ts"
@@ -41,14 +46,16 @@ instance FromJSON Response where
 data Update = Update { upType    :: UpType 
                      , upObject  :: UpObject
                      , upGroupID :: Integer
-                     }
+                     , eventId   :: String
+                     } deriving Show
 instance FromJSON Update where
     parseJSON = withObject "FromJSON VKLib.Update" $ \o -> Update
         <$> o .: "type"
         <*> o .: "object"
         <*> o .: "group_id"
+        <*> o .: "event_id"
 
-data UpType = MessageNew | MessageEvent | TypeUnknown
+data UpType = MessageNew | MessageEvent | TypeUnknown deriving (Show,Eq)
 instance FromJSON UpType where
     parseJSON = withText "VKLib.UpType" $ \s ->
         case s of
@@ -56,15 +63,16 @@ instance FromJSON UpType where
             "message_event"  -> return MessageEvent
             _                -> return TypeUnknown
 
-newtype UpObject = UpObject { objMessage :: ObjMessage}
+newtype UpObject = ObjMEssageNew { message :: ObjMessage} deriving Show
 instance FromJSON UpObject where
-    parseJSON = withObject "FromJSON VKLib.UpObject" $ \o -> UpObject
-        <$> o .: "id"
+    parseJSON = withObject "FromJSON VKLib.UpObject" $ \o -> ObjMEssageNew
+        <$> o .: "message"
 
 data ObjMessage = ObjMessage { mesId :: Integer
                              , fromID :: Integer
                              , text :: String 
-                             , attach :: [Attachment]}
+                             , attach :: [Attachment]
+                             } deriving Show
 instance FromJSON ObjMessage where
     parseJSON = withObject "FromJSON VKLib.ObjMessage" $ \o -> ObjMessage
         <$> o .: "id"
@@ -84,6 +92,7 @@ data Attachment  = AtPhoto { photo :: Photo }
                  | AtWallReply { wallR :: WallReply }
                  | AtSticker { sticker :: Sticker } 
                  | AtGift { gift :: Gift }
+                 deriving Show
 instance FromJSON Attachment where
     parseJSON (Object attach) = do
         aType         <- attach .: "type"
@@ -116,63 +125,64 @@ instance FromJSON Attachment where
 
 data Photo = Photo { photoId :: Integer 
                    , ownerId :: Integer 
-                   }
+                   } deriving Show
 instance FromJSON Photo where
     parseJSON = withObject "FromJSON VKLib.Photo" $ \o -> Photo
         <$> o .: "id"
         <*> o .: "owner_id"
 
-data Video = Video { videoId :: Integer }
+data Video = Video { videoId :: Integer } deriving Show
 instance FromJSON Video where
     parseJSON = withObject "FromJSON VKLib.Video" $ \o -> Video
         <$> o .: "id" 
 
-data Audio = Audio { audioId :: Integer }
+data Audio = Audio { audioId :: Integer } deriving Show
 instance FromJSON Audio where
     parseJSON = withObject "FromJSON VKLib.Audio" $ \o -> Audio
         <$> o .: "id" 
 
-data Document = Doc { docId :: Integer }
+data Document = Doc { docId :: Integer } deriving Show
 instance FromJSON Document where
     parseJSON = withObject "FromJSON VKLib.Document" $ \o -> Doc
         <$> o .: "id" 
 
 data Link = Link { url   :: String 
                  , title :: String 
-                 }
+                 } deriving Show
 instance FromJSON Link where
     parseJSON = withObject "FromJSON VKLib.Link" $ \o -> Link
         <$> o .: "url"
         <*> o .: "title"
 
-data Market = Market { marketId :: Integer }
+data Market = Market { marketId :: Integer } deriving Show
 instance FromJSON Market where
     parseJSON = withObject "FromJSON VKLib.Market" $ \o -> Market
         <$> o .: "id" 
 
-data MarketAlbum = MarketAlbum { mAlbumId :: Integer }
+data MarketAlbum = MarketAlbum { mAlbumId :: Integer } deriving Show
 instance FromJSON MarketAlbum where
     parseJSON = withObject "FromJSON VKLib.MarketAlbum" $ \o -> MarketAlbum
         <$> o .: "id" 
 
-data Wall = Wall { wallId :: Integer }
+data Wall = Wall { wallId :: Integer } deriving Show
 instance FromJSON Wall where
     parseJSON = withObject "FromJSON VKLib.Wall" $ \o -> Wall
         <$> o .: "id" 
 
-data WallReply = WallReply { wReplyId :: Integer}
+data WallReply = WallReply { wReplyId :: Integer } deriving Show
 instance FromJSON WallReply where
     parseJSON = withObject "FromJSON VKLib.WallReply" $ \o -> WallReply
         <$> o .: "id"   
 
 data Sticker = Sticker { prodID  :: Integer
-                       , stickID :: Integer}
+                       , stickID :: Integer
+                       } deriving Show
 instance FromJSON Sticker where
     parseJSON = withObject "FromJSON VKLib.Sticker" $ \o -> Sticker
         <$> o .: "product_id"
         <*> o .: "sticker_id"
 
-data Gift = Gift { giftId :: Integer }
+data Gift = Gift { giftId :: Integer } deriving Show
 instance FromJSON Gift where
     parseJSON = withObject "FromJSON VKLib.Gift" $ \o -> Gift
         <$> o .: "id"   
@@ -193,11 +203,11 @@ getResponseFromAPI settings = do
     res <- HTTP.httpBS request
     return (HTTP.getResponseBody res)
 
-getUpdates :: LongPollServer -> Integer -> Integer -> IO BS.ByteString
+getUpdates :: LongPollServer -> Integer -> String -> IO BS.ByteString
 getUpdates server wait ts = do 
     request <- HTTP.parseRequest $ 
         sAddres server ++ "?act=a_check&key=" ++ key server ++ 
-        "&ts=" ++ show ts ++ "&wait=" ++ show wait
+        "&ts=" ++ ts ++ "&wait=" ++ show wait
     res <- HTTP.httpBS request
     return (HTTP.getResponseBody res)
 
@@ -209,3 +219,12 @@ getServer Config {..} = ReqSet {method = "groups.getLongPollServer",
                 , (BS.fromString "v",  Just $ BS.fromString "5.130")
                 ] }
 
+sendMessage :: Config -> Integer -> Integer -> String -> ReqSet
+sendMessage Config {..} user rnd msg = ReqSet {method = "messages.send",
+    reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupVKId)
+                , (BS.fromString "user_id", Just $ BS.fromString $ show user)
+                , (BS.fromString "random_id", Just $ BS.fromString $ show rnd)
+                , (BS.fromString "message", Just $ BS.fromString msg)
+                , (BS.fromString "access_token", Just $ BS.fromString token)
+                , (BS.fromString "v",  Just $ BS.fromString "5.130")
+                ] }

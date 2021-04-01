@@ -45,7 +45,7 @@ main = do
             case startOn conf of
                 "vk" -> VK.withHandle logger bot (cBotVK conf) $ \handle -> do
                             Logger.debug logger $ show handle
-                            newHandle <- TG.todo handle
+                            newHandle <- VK.todo handle
                             return ()
                 _    -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
                             Logger.debug logger $ show handle
