@@ -10,7 +10,7 @@ import qualified Logger as Logger
 import qualified Bot as Bot
 import qualified Bot.TG as TG
 import qualified Bot.VK as VK
-import qualified Bot.VKLib as VKLib
+import qualified Bot.VK.Types as VKTypes
 
 --import qualified Bot.VK as VK
 
@@ -19,7 +19,7 @@ data Config = Config
     , startOn :: String
     , cBot    :: Bot.Config
     , cBotTG  :: TG.Config
-    , cBotVK  :: VKLib.Config
+    , cBotVK  :: VKTypes.Config
     }
     deriving Show
 instance Aeson.FromJSON Config where

@@ -1,16 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Bot.VKLib where
+module Bot.VK.Methods where
 
 import           Data.Aeson
 import qualified Network.HTTP.Simple as HTTP
 import qualified Data.ByteString.UTF8 as BS
+import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 --import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 import           Bot.VK.Types
 
 -- Types for creating requests
-data ReqSet = ReqSet {method :: String, reqParams :: [(BS.ByteString,Maybe BS.ByteString)]}
+data ReqSet = ReqSet { method :: String
+                     , reqParams :: [(BS.ByteString,Maybe BS.ByteString)]}
 
 getResponseFromAPI :: ReqSet -> IO BS.ByteString
 getResponseFromAPI settings = do
@@ -41,15 +43,46 @@ getServer Config {..} = ReqSet {method = "groups.getLongPollServer",
                 , (BS.fromString "v",  Just $ BS.fromString "5.130")
                 ] }
 
-sendMessage :: Config -> Integer -> Integer -> String -> ReqSet
-sendMessage Config {..} user rnd msg = ReqSet {method = "messages.send",
+sendMessage :: Config -> Integer -> Integer -> String -> Bool -> ReqSet
+sendMessage Config {..} user rnd msg kb = ReqSet {method = "messages.send",
     reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupVKId)
                 , (BS.fromString "user_id", Just $ BS.fromString $ show user)
                 , (BS.fromString "random_id", Just $ BS.fromString $ show rnd)
                 , (BS.fromString "message", Just $ BS.fromString msg)
                 , (BS.fromString "access_token", Just $ BS.fromString token)
                 , (BS.fromString "v",  Just $ BS.fromString "5.130")
-                ] }
+                ] <> sendKB kb}
+
+sendKB :: Bool -> [(BS.ByteString, Maybe BS.ByteString)]
+sendKB flag = if not flag then []
+    else [(BS.fromString "keyboard",  Just $ BSLazy.toStrict $ encode keyboardForRep)]
+
+keyboardForRep = Keyboard 
+    { oneTime = True
+    , buttons = [
+        [ Button { butAction = ButText { bType = "text" 
+                                       , bLabel = "1"
+                                       , payload = ""}
+                 , butColor = PrimaryB }
+        , Button { butAction = ButText { bType = "text" 
+                                       , bLabel = "2"
+                                       , payload = ""}
+                 , butColor = PrimaryB }
+        , Button { butAction = ButText { bType = "text" 
+                                       , bLabel = "3"
+                                       , payload = ""}
+                 , butColor = PrimaryB }
+        , Button { butAction = ButText { bType = "text" 
+                                       , bLabel = "4"
+                                       , payload = ""}
+                 , butColor = PrimaryB }
+        , Button { butAction = ButText { bType = "text" 
+                                       , bLabel = "5"
+                                       , payload = ""}
+                 , butColor = PrimaryB }
+        ]]
+    , inline = False
+    }
 
 copyMessage :: Config -> ObjMEssageNew -> Integer -> Integer -> String -> ReqSet
 copyMessage Config {..} mes user rnd msg = ReqSet 
@@ -59,8 +92,9 @@ copyMessage Config {..} mes user rnd msg = ReqSet
                 , (BS.fromString "random_id", Just $ BS.fromString $ show rnd)
                 , (BS.fromString "message", Just $ BS.fromString msg)
                 , (BS.fromString "access_token", Just $ BS.fromString token)
-                , (BS.fromString "v",  Just $ BS.fromString "5.130")
-                ] <> attachToReq mes}
+                , (BS.fromString "v",  Just $ BS.fromString "5.130") ] 
+                <> attachToReq mes 
+                <> stickToReq mes}
 
 attachToReq :: ObjMEssageNew -> [(BS.ByteString, Maybe BS.ByteString)]
 attachToReq ObjMEssageNew {..} = 
@@ -76,7 +110,21 @@ atString (a:as) = str a <> "," <> atString as
 
 str :: Attachment -> String
 str AtMedia {..} = case access_key media of
-            Nothing -> aType <> (show . ownerId) media <> "_" <> (show . objectId) media
-            Just k  -> aType <> (show . ownerId) media <> "_" <> (show . objectId) media <> "_" <> k
+            "" -> aType <> (show . ownerId) media <> "_" <> (show . objectId) media
+            _  -> aType <> (show . ownerId) media <> "_" <> 
+                           (show . objectId) media <> "_" <> access_key media
+str AtSticker {..} = ""
+str AtLink {..}    = aType <> url link <> "_" <> title link
+
+stickToReq :: ObjMEssageNew -> [(BS.ByteString, Maybe BS.ByteString)]
+stickToReq ObjMEssageNew {..} = foldr stickString [] $ attach message
+
+stickString :: Attachment 
+            -> [(BS.ByteString, Maybe BS.ByteString)] 
+            -> [(BS.ByteString, Maybe BS.ByteString)]
+stickString AtSticker {..} sts = 
+    [(BS.fromString "sticker_id",  Just $ BS.fromString $ show $ stickID sticker)]
+stickString _ sts = sts
+
         
     

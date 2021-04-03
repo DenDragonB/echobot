@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Bot.VK.Types where
 
@@ -143,13 +144,17 @@ instance FromJSON Attachment where
 
 data Media = Media { objectId   :: Integer 
                    , ownerId    :: Integer
-                   , access_key :: Maybe String 
+                   , access_key :: String 
                    } deriving Show
 instance FromJSON Media where
-    parseJSON = withObject "FromJSON VKLib.Photo" $ \o -> Media
-        <$> o .: "id"
-        <*> o .: "owner_id"
-        <*> o .: "access_key"
+    parseJSON (Object med) = do
+        Just id    <- med .: "id"
+        Just owner <- med .: "owner_id"
+--        key        <- med .: "access_key"
+--        case key of
+--            Nothing -> return $ Media id owner ""
+--            Just k  -> 
+        return $ Media id owner "" -- k
 
 data Link = Link { url   :: String 
                  , title :: String 
@@ -166,5 +171,78 @@ instance FromJSON Sticker where
     parseJSON = withObject "FromJSON VKLib.Sticker" $ \o -> Sticker
         <$> o .: "product_id"
         <*> o .: "sticker_id"
+
+data Keyboard = Keyboard { oneTime :: Bool
+                         , buttons :: [[Button]]
+                         , inline  :: Bool
+                         } deriving Show
+instance FromJSON Keyboard where
+    parseJSON = withObject "FromJSON VKLib.Keyboard" $ \o -> Keyboard
+        <$> o .: "one_time"
+        <*> o .: "buttons"
+        <*> o .: "inline"
+instance ToJSON Keyboard where
+    toJSON keyboard = object [ "one_time" .= oneTime keyboard
+                             , "buttons"  .= buttons keyboard
+                             , "inline"   .= inline keyboard
+                             ]
         
+data Button = Button { butAction :: ButAction
+                     , butColor  :: ButColor
+                     } deriving Show
+instance FromJSON Button where
+    parseJSON = withObject "FromJSON VKLib.Button" $ \o -> Button
+        <$> o .: "action"
+        <*> o .: "color"
+instance ToJSON Button where
+    toJSON but = object [ "action" .= butAction but
+                        , "color"  .= butColor but
+                        ]
+
+data ButColor = PrimaryB             -- синяя кнопка, обозначает основное действие. #5181B8
+              | SecondaryB           -- обычная белая кнопка. #FFFFFF
+              | NegativeB            -- опасное действие, или отрицательное действие 
+                                     -- (отклонить, удалить и тд). #E64646
+              | PositiveB            -- согласиться, подтвердить. #4BB34B
+instance Show ButColor where
+    show PrimaryB   = "primary"
+    show SecondaryB = "secondary"
+    show NegativeB  = "negative"
+    show PositiveB  = "positive"
+instance FromJSON ButColor where
+    parseJSON = withText "VKLib.ButColor" $ \s ->
+        case s of
+            "primary"    -> return PrimaryB
+            "secondary"  -> return SecondaryB
+            "negative"  -> return NegativeB
+            "positive"  -> return PositiveB
+            _            -> fail $ "Unknown color for button"
+instance ToJSON ButColor where
+    toJSON PrimaryB   = "primary"
+    toJSON SecondaryB = "secondary"
+    toJSON NegativeB  = "negative"
+    toJSON PositiveB  = "positive"
+
+data ButAction = ButText { bType   :: String 
+                         , bLabel  :: String
+                         , payload :: String
+                         } 
+               | ButOther { bType   :: String }
+               deriving Show
+instance FromJSON ButAction where
+    parseJSON (Object but) = do
+        Just butType    <- but .: "type"
+        case butType of
+            "text" -> do
+                Just butL  <- but .: "label"
+                Just butPL <- but .: "payload"
+                return $ ButText butType butL butPL
+            _ -> return $ ButOther butType
+instance ToJSON ButAction where
+    toJSON ButText {..} = object [ "type"    .= bType
+                                 , "label"   .= bLabel
+                                 , "payload" .= payload
+                                 ]
+    toJSON ButOther {..} = object [ "type" .= bType ]
+
     
