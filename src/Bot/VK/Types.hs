@@ -4,9 +4,6 @@
 module Bot.VK.Types where
 
 import           Data.Aeson
-import qualified Network.HTTP.Simple as HTTP
-import qualified Data.ByteString.UTF8 as BS
---import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 
 newtype RespServer = RespServer {getResp :: LongPollServer} deriving Show
 instance FromJSON RespServer where
@@ -43,15 +40,11 @@ instance FromJSON Response where
         <$> o .: "ts"
         <*> o .: "updates"
 
-data Update = NewMessage { upType    :: UpType 
-                         , upObject  :: ObjMEssageNew
-                         , upGroupID :: Integer
-                         , eventId   :: String
-                         } 
-            | Other      { upType    :: UpType 
-                         , upGroupID :: Integer
-                         , eventId   :: String
-                         } deriving Show
+data Update = Update { upType    :: UpType 
+                     , upObject  :: Maybe ObjMEssageNew
+                     , upGroupID :: Integer
+                     , eventId   :: String
+                     } deriving Show
 instance FromJSON Update where
     parseJSON (Object upd) = do
         Just uType  <- upd .: "type"
@@ -60,15 +53,16 @@ instance FromJSON Update where
         case uType of
             MessageNew -> do
                 Just uObj <- upd .: "object"
-                return NewMessage { upType    = uType 
-                                  , upObject  = uObj
-                                  , upGroupID = uGroup
-                                  , eventId   = uEvent
-                                  }
-            _ -> return Other { upType    = uType
-                              , upGroupID = uGroup
-                              , eventId   = uEvent
-                              }
+                return Update  { upType    = uType 
+                               , upObject  = Just uObj
+                               , upGroupID = uGroup
+                               , eventId   = uEvent
+                               }
+            _ -> return Update { upType   = uType
+                               , upGroupID = uGroup
+                               , eventId   = uEvent
+                               , upObject  = Nothing 
+                               }
 
 
 data UpType = MessageNew | MessageEvent | TypeUnknown deriving (Show,Eq)
@@ -97,9 +91,9 @@ instance FromJSON ObjMessage where
         <*> o .: "attachments"
 
 
-data Attachment  = AtMedia { aType :: String, media :: Media }
-                 | AtLink { aType :: String, link :: Link } 
-                 | AtSticker { aType :: String, sticker :: Sticker } 
+data Attachment  = AtMedia   String Media
+                 | AtLink    String Link
+                 | AtSticker String Sticker
                  deriving Show
 instance FromJSON Attachment where
     parseJSON (Object attach) = do

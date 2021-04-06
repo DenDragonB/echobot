@@ -180,14 +180,3 @@ todo handle =
     setRepeat >>=
     copyMessage >>=
     todo
-
-configTest = Config { token = "" 
-                    , timeout = 60
-                    }
-handleTest = Handle
-    { hConfig = configTest
-    , hBot = Bot.handleTest
-    , hLogger = Logger.handleTest
-    , offset = 0
-    , response = Nothing
-    }

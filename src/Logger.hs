@@ -6,15 +6,8 @@ module Logger
     , LogTo (..)
     , Config (..)
     , Handle (..)
+
     , withHandle
-
-    , debug
-    , info
-    , warning
-    , error
-
-    , configTest
-    , handleTest
 
     ) where
 
@@ -32,11 +25,11 @@ data LogLevel
     deriving (Eq, Ord, Show)
 instance A.FromJSON LogLevel where
     parseJSON = A.withText "FromJSON Logger.LogLevel" $ \t ->
-        case t of
-            "Debug"   -> pure Debug
-            "Info"    -> pure Info
-            "Warning" -> pure Warning
-            "Error"   -> pure Error
+        case T.toUpper t of
+            "DEBUG"   -> pure Debug
+            "INFO"    -> pure Info
+            "WARNING" -> pure Warning
+            "ERROR"   -> pure Error
             _         -> fail $ "Unknown log level: " ++ T.unpack t
 
 data LogTo
@@ -45,9 +38,9 @@ data LogTo
     deriving (Eq, Ord, Show)
 instance A.FromJSON LogTo where
     parseJSON = A.withText "FromJSON Logger.LogTo" $ \t ->
-        case t of
-            "LogToFile"    -> pure LogToFile
-            "LogToConsole" -> pure LogToConsole
+        case T.toUpper t of
+            "LOFTOFILE"    -> pure LogToFile
+            "LOGTOCONSOLE" -> pure LogToConsole
             _         -> fail $ "Unknown where log to: " ++ T.unpack t
 
 data Config = Config
@@ -70,12 +63,22 @@ instance A.FromJSON Config where
                       }
 
 data Handle = Handle 
-    { hConfig :: Config  }
-    deriving Show
+    { debug :: String -> IO ()
+    , info :: String -> IO ()
+    , warning :: String -> IO ()
+    , error :: String -> IO ()
+    }
+instance Show Handle where
+    show _ = "Logger services" 
 
 -- Create Handle with Config
 withHandle :: Config -> (Handle -> IO a) -> IO a
-withHandle config f = f $ Handle config
+withHandle config f = f $ Handle
+    { debug   = log config Debug
+    , info    = log config Info
+    , warning = log config Warning
+    , error   = log config Error
+    }
 
 -- Output log string to file
 logToFile :: Config -> LogLevel -> String -> IO ()
@@ -89,21 +92,8 @@ logToConsole :: LogLevel -> String -> IO ()
 logToConsole lvl str = IO.hPutStrLn IO.stderr $ show lvl ++ ": " ++ str
 
 -- Output log depending on the configuration
-log :: Handle -> LogLevel -> String -> IO ()
-log (Handle {..}) lvl str | lvl >= logMinLevel hConfig = case logTo hConfig of
-                                                           LogToFile -> logToFile hConfig lvl str
-                                                           _         -> logToConsole lvl str
-                          | otherwise                  = return ()
-
-debug, info, warning, error :: Handle -> String -> IO ()
-debug   h = log h Debug
-info    h = log h Info
-warning h = log h Warning
-error   h = log h Error
-
-configTest = Config 
-    { logTo = LogToFile
-    , logPath = "log.txt" 
-    , logMinLevel = Debug
-    }
-handleTest = Handle {  hConfig = configTest }
+log :: Config -> LogLevel -> String -> IO ()
+log conf lvl str | lvl >= logMinLevel conf = case logTo conf of
+                                LogToFile -> logToFile conf lvl str
+                                _         -> logToConsole lvl str
+                 | otherwise               = return ()

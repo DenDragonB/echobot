@@ -109,12 +109,12 @@ atString [a]    = str a
 atString (a:as) = str a <> "," <> atString as
 
 str :: Attachment -> String
-str AtMedia {..} = case access_key media of
-            "" -> aType <> (show . ownerId) media <> "_" <> (show . objectId) media
-            _  -> aType <> (show . ownerId) media <> "_" <> 
-                           (show . objectId) media <> "_" <> access_key media
-str AtSticker {..} = ""
-str AtLink {..}    = aType <> url link <> "_" <> title link
+str (AtMedia t m) = case access_key m of
+            "" -> t <> (show . ownerId) m <> "_" <> (show . objectId) m
+            _  -> t <> (show . ownerId) m <> "_" <> 
+                           (show . objectId) m <> "_" <> access_key m
+str (AtSticker _ _) = ""
+str (AtLink t link) = t <> url link <> "_" <> title link
 
 stickToReq :: ObjMEssageNew -> [(BS.ByteString, Maybe BS.ByteString)]
 stickToReq ObjMEssageNew {..} = foldr stickString [] $ attach message
@@ -122,9 +122,13 @@ stickToReq ObjMEssageNew {..} = foldr stickString [] $ attach message
 stickString :: Attachment 
             -> [(BS.ByteString, Maybe BS.ByteString)] 
             -> [(BS.ByteString, Maybe BS.ByteString)]
-stickString AtSticker {..} sts = 
+stickString (AtSticker _ sticker) sts = 
     [(BS.fromString "sticker_id",  Just $ BS.fromString $ show $ stickID sticker)]
 stickString _ sts = sts
 
+aType :: Attachment -> String
+aType (AtMedia t _)   = t
+aType (AtSticker t _) = t
+aType (AtLink t _)    = t
         
     
