@@ -25,7 +25,7 @@ instance A.FromJSON Config where
 
 data Handle = Handle
     { hConfig :: Config
-    ,  users :: [User]
+    , users   :: [User]
     }
     deriving Show
 
@@ -70,15 +70,3 @@ putRepeat (u:us) newUser | uID u == uID newUser = newUser : us
 
 getRepeat :: [User] -> URep -> UID -> URep
 getRepeat us defRep id = foldr (\u ini -> if uID u == id then uRep u else ini) defRep us 
-
-configTest = Config 
-    { aboutText     = "about text"
-    , helpText      = "help text"
-    , repeatText1   = "repeat now"
-    , repeatText2   = "repeat what"
-    , repeatDefault = 1
-    }
-handleTest = Handle
-    { hConfig = configTest
-    , users = [] 
-    }

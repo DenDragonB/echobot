@@ -1,13 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Bot.VK.Methods where
+module Bot.VK.Methods 
+    ( getResponseFromAPI
+    , getUpdates
+    , getServer
+    , sendMessage
+    , copyMessage
 
-import           Data.Aeson
+    , ReqSet ()
+    
+    ) where
+
+import           Data.Aeson ( encode )
 import qualified Network.HTTP.Simple as HTTP
 import qualified Data.ByteString.UTF8 as BS
 import qualified Data.ByteString.Lazy as BSLazy (toStrict)
---import qualified Data.ByteString.Lazy as BSLazy (toStrict)
+
 import           Bot.VK.Types
 
 -- Types for creating requests
@@ -57,6 +66,7 @@ sendKB :: Bool -> [(BS.ByteString, Maybe BS.ByteString)]
 sendKB flag = if not flag then []
     else [(BS.fromString "keyboard",  Just $ BSLazy.toStrict $ encode keyboardForRep)]
 
+keyboardForRep :: Keyboard
 keyboardForRep = Keyboard 
     { oneTime = True
     , buttons = [
