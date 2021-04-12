@@ -6,8 +6,8 @@ import Test.Hspec
 import qualified Logger
 import qualified Bot
 import Bot.VK
-import Bot.VK.Types
-import Bot.VK.Methods
+import Bot.TG.Types
+import Bot.TG.Methods
 
 testConfig :: Config
 testConfig = Config

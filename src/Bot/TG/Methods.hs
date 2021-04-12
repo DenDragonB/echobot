@@ -49,8 +49,8 @@ keyboard = TGKeyBoard
                 True
                 False
 
-tgCopyMessage :: Integer -> Integer -> Integer -> ReqSet
-tgCopyMessage chatID fromChatID messageID = ReqSet {method = "copyMessage",
+copyMessage :: Integer -> Integer -> Integer -> ReqSet
+copyMessage chatID fromChatID messageID = ReqSet {method = "copyMessage",
             reqParams = [ (BS.fromString "chat_id", Just $ BS.fromString $ show chatID)
                         , (BS.fromString "from_chat_id", Just $ BS.fromString $ show fromChatID)
                         , (BS.fromString "message_id", Just $ BS.fromString $ show messageID)

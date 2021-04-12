@@ -4,22 +4,19 @@
 module Bot.VK.Types where
 
 import           Data.Aeson
-import qualified Network.HTTP.Simple as HTTP
-import qualified Data.ByteString.UTF8 as BS
---import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 
 newtype RespServer = RespServer {getResp :: LongPollServer} deriving Show
 instance FromJSON RespServer where
-    parseJSON = withObject "FromJSON VKLib.Response" $ \o -> RespServer
+    parseJSON = withObject "FromJSON VK.Types.Response of Server" $ \o -> RespServer
         <$> o .: "response"
 
 data LongPollServer = LPServer 
     { sAddres :: String
     , key     :: String
     , startTs :: String
-    } deriving Show
+    } deriving (Show,Eq)
 instance FromJSON LongPollServer where
-    parseJSON = withObject "FromJSON VKLib.LPServer" $ \o -> LPServer
+    parseJSON = withObject "FromJSON VK.Types.LPServer" $ \o -> LPServer
         <$> o .: "server"
         <*> o .: "key"
         <*> o .: "ts"
@@ -28,69 +25,66 @@ data Config = Config
     { token     :: String
     , groupVKId :: Integer
     , timeout   :: Integer
-    } deriving Show
+    } deriving (Show,Eq)
 instance FromJSON Config where
-    parseJSON = withObject "FromJSON VKLib.Config" $ \o -> Config
+    parseJSON = withObject "FromJSON VK.Types.Config" $ \o -> Config
         <$> o .: "token"
         <*> o .: "groupId"
         <*> o .: "timeout"
 
 data Response = Response { ts      :: String     -- number of last events
                          , updates :: [Update]  -- new events
-                         } deriving Show
+                         } deriving (Show,Eq)
 instance FromJSON Response where
-    parseJSON = withObject "FromJSON VKLib.Response" $ \o -> Response
+    parseJSON = withObject "FromJSON VK.Types.Response" $ \o -> Response
         <$> o .: "ts"
         <*> o .: "updates"
 
-data Update = NewMessage { upType    :: UpType 
-                         , upObject  :: ObjMEssageNew
-                         , upGroupID :: Integer
-                         , eventId   :: String
-                         } 
-            | Other      { upType    :: UpType 
-                         , upGroupID :: Integer
-                         , eventId   :: String
-                         } deriving Show
+data Update = Update { upType    :: UpType 
+                     , upObject  :: Maybe ObjMEssageNew
+                     , upGroupID :: Integer
+                     , eventId   :: String
+                     } deriving (Show,Eq)
 instance FromJSON Update where
-    parseJSON (Object upd) = do
-        Just uType  <- upd .: "type"
-        Just uGroup <- upd .: "group_id"
-        Just uEvent <- upd .: "event_id"
+    parseJSON = withObject "FromJSON VK.Types.Response" $ \upd -> do
+        uType  <- upd .: "type"
+        uGroup <- upd .: "group_id"
+        uEvent <- upd .: "event_id"
         case uType of
             MessageNew -> do
                 Just uObj <- upd .: "object"
-                return NewMessage { upType    = uType 
-                                  , upObject  = uObj
-                                  , upGroupID = uGroup
-                                  , eventId   = uEvent
-                                  }
-            _ -> return Other { upType    = uType
-                              , upGroupID = uGroup
-                              , eventId   = uEvent
-                              }
+                return Update  { upType    = uType 
+                               , upObject  = Just uObj
+                               , upGroupID = uGroup
+                               , eventId   = uEvent
+                               }
+            _ -> return Update { upType   = uType
+                               , upGroupID = uGroup
+                               , eventId   = uEvent
+                               , upObject  = Nothing 
+                               }
 
 
 data UpType = MessageNew | MessageEvent | TypeUnknown deriving (Show,Eq)
 instance FromJSON UpType where
-    parseJSON = withText "VKLib.UpType" $ \s ->
+    parseJSON = withText "FromJSON VK.Types.UpType" $ \s ->
         case s of
             "message_new"    -> return MessageNew
             "message_event"  -> return MessageEvent
             _                -> return TypeUnknown
 
-newtype ObjMEssageNew = ObjMEssageNew { message :: ObjMessage} deriving Show
+newtype ObjMEssageNew = ObjMEssageNew { message :: ObjMessage} deriving (Show,Eq)
 instance FromJSON ObjMEssageNew where
-    parseJSON = withObject "FromJSON VKLib.UpObject" $ \o -> ObjMEssageNew
+    parseJSON = withObject "FromJSON VK.Types.UpObject" $ \o -> ObjMEssageNew
         <$> o .: "message"
 
 data ObjMessage = ObjMessage { mesId :: Integer
                              , fromID :: Integer
                              , text :: String 
                              , attach :: [Attachment]
-                             } deriving Show
+                             } deriving (Show,Eq)
 instance FromJSON ObjMessage where
-    parseJSON = withObject "FromJSON VKLib.ObjMessage" $ \o -> ObjMessage
+    parseJSON = withObject "FromJSON VK.Types.ObjMessage" $ \o -> ObjMessage
         <$> o .: "id"
         <*> o .: "from_id"
         <*> o .: "text"
@@ -100,12 +94,12 @@ instance FromJSON ObjMessage where
 data Attachment  = AtMedia { aType :: String, media :: Media }
                  | AtLink { aType :: String, link :: Link } 
                  | AtSticker { aType :: String, sticker :: Sticker } 
-                 deriving Show
+                 deriving (Show,Eq)
 instance FromJSON Attachment where
-    parseJSON (Object attach) = do
-        aType         <- attach .: "type"
-        case aType :: Maybe String of
-            Nothing -> fail "FromJSON VKLib.Attachment"
+    parseJSON = withObject "FromJSON VK.Types.Attachment" $ \attach -> do
+        aType <- attach .: "type"
+        case aType of
+            Nothing -> fail "FromJSON VK.Types.Attachment"
             Just "photo"        -> do
                 Just aPhoto   <- attach .: "photo"
                 return $ AtMedia "photo" aPhoto
@@ -139,36 +133,32 @@ instance FromJSON Attachment where
             Just "gift"         -> do
                 Just aGift    <- attach .: "gift"
                 return $ AtMedia "gift" aGift
-
-
+            Just a -> fail $ "FromJSON VK.Types.Attachment: unknown attachment " <> a
 
 data Media = Media { objectId   :: Integer 
                    , ownerId    :: Integer
                    , access_key :: String 
-                   } deriving Show
+                   } deriving (Show,Eq)
 instance FromJSON Media where
-    parseJSON (Object med) = do
-        Just id    <- med .: "id"
-        Just owner <- med .: "owner_id"
---        key        <- med .: "access_key"
---        case key of
---            Nothing -> return $ Media id owner ""
---            Just k  -> 
-        return $ Media id owner "" -- k
+    parseJSON = withObject "FromJSON VK.Types.Media" $ \o -> do
+        mid  <- o .: "id"
+        moid <- o .: "owner_id"
+        return $ Media mid moid ""
+
 
 data Link = Link { url   :: String 
                  , title :: String 
-                 } deriving Show
+                 } deriving (Show,Eq)
 instance FromJSON Link where
-    parseJSON = withObject "FromJSON VKLib.Link" $ \o -> Link
+    parseJSON = withObject "FromJSON VK.Types.Link" $ \o -> Link
         <$> o .: "url"
         <*> o .: "title"
 
 data Sticker = Sticker { prodID  :: Integer
                        , stickID :: Integer
-                       } deriving Show
+                       } deriving (Show,Eq)
 instance FromJSON Sticker where
-    parseJSON = withObject "FromJSON VKLib.Sticker" $ \o -> Sticker
+    parseJSON = withObject "FromJSON VK.Types.Sticker" $ \o -> Sticker
         <$> o .: "product_id"
         <*> o .: "sticker_id"
 
@@ -177,7 +167,7 @@ data Keyboard = Keyboard { oneTime :: Bool
                          , inline  :: Bool
                          } deriving Show
 instance FromJSON Keyboard where
-    parseJSON = withObject "FromJSON VKLib.Keyboard" $ \o -> Keyboard
+    parseJSON = withObject "FromJSON VK.Types.Keyboard" $ \o -> Keyboard
         <$> o .: "one_time"
         <*> o .: "buttons"
         <*> o .: "inline"
@@ -191,7 +181,7 @@ data Button = Button { butAction :: ButAction
                      , butColor  :: ButColor
                      } deriving Show
 instance FromJSON Button where
-    parseJSON = withObject "FromJSON VKLib.Button" $ \o -> Button
+    parseJSON = withObject "FromJSON VK.Types.Button" $ \o -> Button
         <$> o .: "action"
         <*> o .: "color"
 instance ToJSON Button where
@@ -210,7 +200,7 @@ instance Show ButColor where
     show NegativeB  = "negative"
     show PositiveB  = "positive"
 instance FromJSON ButColor where
-    parseJSON = withText "VKLib.ButColor" $ \s ->
+    parseJSON = withText "VK.Types.ButColor" $ \s ->
         case s of
             "primary"    -> return PrimaryB
             "secondary"  -> return SecondaryB
@@ -230,12 +220,12 @@ data ButAction = ButText { bType   :: String
                | ButOther { bType   :: String }
                deriving Show
 instance FromJSON ButAction where
-    parseJSON (Object but) = do
-        Just butType    <- but .: "type"
+    parseJSON = withObject "FromJSON VK.Types.ButAction" $ \o -> do
+        butType    <- o .: "type"
         case butType of
             "text" -> do
-                Just butL  <- but .: "label"
-                Just butPL <- but .: "payload"
+                butL  <- o .: "label"
+                butPL <- o .: "payload"
                 return $ ButText butType butL butPL
             _ -> return $ ButOther butType
 instance ToJSON ButAction where

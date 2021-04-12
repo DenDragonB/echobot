@@ -28,6 +28,7 @@ dependencies:
 - text
 - http-conduit
 - time
+- hspec
 
 library:
   source-dirs: src
@@ -40,6 +41,8 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
+    - -Werror
     dependencies:
     - echobot
 

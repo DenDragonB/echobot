@@ -6,15 +6,13 @@ module Logger
     , LogTo (..)
     , Config (..)
     , Handle (..)
+
     , withHandle
 
     , debug
     , info
     , warning
     , error
-
-    , configTest
-    , handleTest
 
     ) where
 
@@ -55,27 +53,22 @@ data Config = Config
     , logPath :: IO.FilePath
     , logMinLevel :: LogLevel
     }
-    deriving (Show)
+    deriving (Show,Eq)
 instance A.FromJSON Config where
-    parseJSON (A.Object config) = do
-        Just logTo    <- config A..: "logTo"
-        Just logLevel <- config A..: "logMinLevel"
-        Just logPath  <- config A..: "logPath"
-        let cLogPath = case logPath of
-                          "" -> "log.txt"
-                          _  -> logPath
-        return Config { logTo       = logTo
-                      , logPath     = cLogPath
-                      , logMinLevel = logLevel
-                      }
+    parseJSON = A.withObject "FromJSON Logger.Config" $ \o -> 
+        Config <$> o A..: "logTo"
+               <*> o A..: "logPath" 
+               <*> o A..: "logMinLevel" 
 
 data Handle = Handle 
     { hConfig :: Config  }
-    deriving Show
+    deriving (Show,Eq)
 
 -- Create Handle with Config
 withHandle :: Config -> (Handle -> IO a) -> IO a
-withHandle config f = f $ Handle config
+withHandle config f = case logPath config of
+    "" -> f $ Handle config {logPath = "log.txt"}
+    _  -> f $ Handle config 
 
 -- Output log string to file
 logToFile :: Config -> LogLevel -> String -> IO ()
@@ -100,10 +93,3 @@ debug   h = log h Debug
 info    h = log h Info
 warning h = log h Warning
 error   h = log h Error
-
-configTest = Config 
-    { logTo = LogToFile
-    , logPath = "log.txt" 
-    , logMinLevel = Debug
-    }
-handleTest = Handle {  hConfig = configTest }

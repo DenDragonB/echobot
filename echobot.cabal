@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5faf68a8bcb4e78fdce44bf1fe9ee726ab7527fa6658477344dc76aaf610d7b3
+-- hash: 520d915174b2ec0acb8c0eb1516555b5346e80d38f6d5286b777e0e2b376ddc2
 
 name:           echobot
 version:        0.1.0.0
@@ -29,7 +29,8 @@ library
   exposed-modules:
       Bot
       Bot.TG
-      Bot.TGLib
+      Bot.TG.Methods
+      Bot.TG.Types
       Bot.VK
       Bot.VK.Methods
       Bot.VK.Types
@@ -42,6 +43,7 @@ library
       aeson
     , base >=4.7 && <11
     , bytestring
+    , hspec
     , htoml
     , http-conduit
     , text
@@ -55,12 +57,13 @@ executable echobot-exe
       Paths_echobot
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
   build-depends:
       aeson
     , base >=4.7 && <11
     , bytestring
     , echobot
+    , hspec
     , htoml
     , http-conduit
     , text
@@ -72,6 +75,8 @@ test-suite echobot-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      TestTG
+      TestVK
       Paths_echobot
   hs-source-dirs:
       test
@@ -81,6 +86,7 @@ test-suite echobot-test
     , base >=4.7 && <11
     , bytestring
     , echobot
+    , hspec
     , htoml
     , http-conduit
     , text

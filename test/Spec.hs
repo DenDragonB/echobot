@@ -1,2 +1,7 @@
+module Main where
+
+import qualified TestVK
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = do
+    TestVK.main

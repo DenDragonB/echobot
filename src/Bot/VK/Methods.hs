@@ -1,18 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Bot.VK.Methods where
+module Bot.VK.Methods 
+    ( ReqSet (..)
+-- functions to send request to vk servers
+    , getResponseFromAPI
+    , getUpdates
+-- vk api methods
+    , getServer
+    , sendMessage
+    , copyMessage
+  
+    ) where
 
-import           Data.Aeson
 import qualified Network.HTTP.Simple as HTTP
 import qualified Data.ByteString.UTF8 as BS
 import qualified Data.ByteString.Lazy as BSLazy (toStrict)
---import qualified Data.ByteString.Lazy as BSLazy (toStrict)
+import           Data.Aeson (encode)
 import           Bot.VK.Types
 
 -- Types for creating requests
 data ReqSet = ReqSet { method :: String
-                     , reqParams :: [(BS.ByteString,Maybe BS.ByteString)]}
+                     , reqParams :: [(BS.ByteString,Maybe BS.ByteString)]} deriving (Show,Eq)
 
 getResponseFromAPI :: ReqSet -> IO BS.ByteString
 getResponseFromAPI settings = do
@@ -57,6 +66,7 @@ sendKB :: Bool -> [(BS.ByteString, Maybe BS.ByteString)]
 sendKB flag = if not flag then []
     else [(BS.fromString "keyboard",  Just $ BSLazy.toStrict $ encode keyboardForRep)]
 
+keyboardForRep :: Keyboard
 keyboardForRep = Keyboard 
     { oneTime = True
     , buttons = [
@@ -85,16 +95,10 @@ keyboardForRep = Keyboard
     }
 
 copyMessage :: Config -> ObjMEssageNew -> Integer -> Integer -> String -> ReqSet
-copyMessage Config {..} mes user rnd msg = ReqSet 
-    { method = "messages.send"
-    , reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupVKId)
-                , (BS.fromString "user_id", Just $ BS.fromString $ show user)
-                , (BS.fromString "random_id", Just $ BS.fromString $ show rnd)
-                , (BS.fromString "message", Just $ BS.fromString msg)
-                , (BS.fromString "access_token", Just $ BS.fromString token)
-                , (BS.fromString "v",  Just $ BS.fromString "5.130") ] 
-                <> attachToReq mes 
-                <> stickToReq mes}
+copyMessage conf mes user rnd msg = 
+    let req = sendMessage conf user rnd msg False
+        param = reqParams req
+    in req {reqParams = param <> attachToReq mes <> stickToReq mes}
 
 attachToReq :: ObjMEssageNew -> [(BS.ByteString, Maybe BS.ByteString)]
 attachToReq ObjMEssageNew {..} = 
@@ -107,13 +111,14 @@ attachToReq ObjMEssageNew {..} =
 atString :: [Attachment] -> String
 atString [a]    = str a
 atString (a:as) = str a <> "," <> atString as
+atString _      = ""
 
 str :: Attachment -> String
 str AtMedia {..} = case access_key media of
             "" -> aType <> (show . ownerId) media <> "_" <> (show . objectId) media
             _  -> aType <> (show . ownerId) media <> "_" <> 
                            (show . objectId) media <> "_" <> access_key media
-str AtSticker {..} = ""
+str AtSticker {} = ""
 str AtLink {..}    = aType <> url link <> "_" <> title link
 
 stickToReq :: ObjMEssageNew -> [(BS.ByteString, Maybe BS.ByteString)]
@@ -122,7 +127,7 @@ stickToReq ObjMEssageNew {..} = foldr stickString [] $ attach message
 stickString :: Attachment 
             -> [(BS.ByteString, Maybe BS.ByteString)] 
             -> [(BS.ByteString, Maybe BS.ByteString)]
-stickString AtSticker {..} sts = 
+stickString AtSticker {..} _ = 
     [(BS.fromString "sticker_id",  Just $ BS.fromString $ show $ stickID sticker)]
 stickString _ sts = sts
 

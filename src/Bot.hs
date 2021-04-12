@@ -3,7 +3,6 @@
 module Bot where
 
 import qualified Data.Aeson as A
-import qualified Logger
 
 type Token = String
 
@@ -14,7 +13,7 @@ data Config = Config
     , repeatText2   :: String
     , repeatDefault :: URep
     }
-    deriving Show
+    deriving (Show,Eq)
 instance A.FromJSON Config where
     parseJSON = A.withObject "FromJSON BotTelegram.Config" $ \o -> Config
         <$> o A..: "aboutText"   
@@ -27,7 +26,7 @@ data Handle = Handle
     { hConfig :: Config
     ,  users :: [User]
     }
-    deriving Show
+    deriving (Show,Eq)
 
 -- type of user to store the number of repetitions
 type UName = String
@@ -39,7 +38,7 @@ data User  = User
     , uRep     :: URep
     , uSentRep :: Bool
     }
-    deriving Show
+    deriving (Show,Eq)
 
 withHandle :: Config -> (Handle -> IO ()) -> IO ()
 withHandle conf f = f $ Handle conf []
@@ -60,8 +59,8 @@ setCommand (u:us) newUser
 
 getCommand :: [User] -> UID -> Bool
 getCommand [] _      = False
-getCommand (u:us) id | uID u == id = uSentRep u
-                     | otherwise   = getCommand us id
+getCommand (u:us) uid | uID u == uid = uSentRep u
+                      | otherwise   = getCommand us uid
 
 putRepeat :: [User] -> User -> [User]
 putRepeat [] newUser = [newUser]
@@ -69,16 +68,4 @@ putRepeat (u:us) newUser | uID u == uID newUser = newUser : us
                          | otherwise = u : putRepeat us newUser 
 
 getRepeat :: [User] -> URep -> UID -> URep
-getRepeat us defRep id = foldr (\u ini -> if uID u == id then uRep u else ini) defRep us 
-
-configTest = Config 
-    { aboutText     = "about text"
-    , helpText      = "help text"
-    , repeatText1   = "repeat now"
-    , repeatText2   = "repeat what"
-    , repeatDefault = 1
-    }
-handleTest = Handle
-    { hConfig = configTest
-    , users = [] 
-    }
+getRepeat us defRep uid = foldr (\u ini -> if uID u == uid then uRep u else ini) defRep us 

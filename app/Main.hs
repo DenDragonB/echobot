@@ -30,24 +30,25 @@ instance Aeson.FromJSON Config where
         <*> o Aeson..: "telegram" 
         <*> o Aeson..: "vk"
 
-
 main :: IO ()
 main = do
     -- read config
     tMainConf <- readFile "app/main.conf"
     tUserConf <- readFile "config.conf"
     let Right toml = TOML.parseTomlDoc "" $ T.pack $ tUserConf ++ tMainConf 
-    let Just conf = Aeson.decode $ Aeson.encode toml :: Maybe Config      
-
-    -- Logger.info hlogger "Logger is work"
-    Logger.withHandle (cLogger conf) $ \logger ->
-        Bot.withHandle (cBot conf) $ \bot ->
-            case startOn conf of
-                "vk" -> VK.withHandle logger bot (cBotVK conf) $ \handle -> do
-                            Logger.debug logger $ show handle
-                            newHandle <- VK.todo handle
-                            return ()
-                _    -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
-                            Logger.debug logger $ show handle
-                            newHandle <- TG.todo handle
-                            return ()
+    let config = Aeson.eitherDecode $ Aeson.encode toml :: Either String Config
+    case config of
+        Left str   -> print str
+        Right conf -> do
+            -- Logger.info hlogger "Logger is work"
+            Logger.withHandle (cLogger conf) $ \logger ->
+                Bot.withHandle (cBot conf) $ \bot ->
+                    case startOn conf of
+                        "vk" -> VK.withHandle logger bot (cBotVK conf) $ \handle -> do
+                                    Logger.debug logger $ show handle
+                                    _ <- VK.todo handle
+                                    return ()
+                        _    -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
+                                    Logger.debug logger $ show handle
+                                    _ <- TG.todo handle
+                                    return ()
