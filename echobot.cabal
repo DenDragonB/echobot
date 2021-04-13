@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 520d915174b2ec0acb8c0eb1516555b5346e80d38f6d5286b777e0e2b376ddc2
+-- hash: 6e483488d87d8eafbc85984359562967a0b44c44eec7255ae52b5a60cec193ee
 
 name:           echobot
 version:        0.1.0.0
@@ -75,6 +75,7 @@ test-suite echobot-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      TestBot
       TestTG
       TestVK
       Paths_echobot

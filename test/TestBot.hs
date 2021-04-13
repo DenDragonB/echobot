@@ -7,78 +7,65 @@ import Bot
 
 testConfig :: Config
 testConfig = Config
-    { token     = "1a2bc3"
-    , timeout   = 60
+    { aboutText     = "about"
+    , helpText      = "help"
+    , repeatText1   = "repeat1"
+    , repeatText2   = "repeat2"
+    , Bot.repeatDefault = 1
     }
 
-testHandle :: Handle
-testHandle = Bot.Handle 
-        { Bot.hConfig = Bot.Config
-            { Bot.aboutText     = "about"
-            , Bot.helpText      = "help"
-            , Bot.repeatText1   = "repeat1"
-            , Bot.repeatText2   = "repeat2"
-            , Bot.repeatDefault = 1
-            }
-        ,  Bot.users = []
-        }
-    , hLogger  = Logger.Handle
-        { Logger.hConfig = Logger.Config
-            { Logger.logTo = Logger.LogToConsole
-            , Logger.logPath = ""
-            , Logger.logMinLevel = Logger.Debug 
-            }
-        }
-    , offset   = 25
-    , response = Just testResponse
-    }
+testUsersEmpty :: [User]
+testUsersEmpty = []
 
-testResponse :: Response
-testResponse = Response
-    { responseOk = True
-    , responseResult = [testUpdate]
-    }
+testUsers :: [User]
+testUsers = [testUser1,testUser2]
 
-testUpdate :: Update
-testUpdate = UpMessge
-    { updateId = 123
-    , message = Nothing
-    }
+testUser1 :: User
+testUser1 = User "user1" 1 1 False
+
+testUser2 :: User
+testUser2 = User "user2" 2 1 True
+
+testUser3 :: User
+testUser3 = User "user3" 3 3 True
 
 main :: IO ()
 main = hspec $ do
-    describe "TG API methods" $ do
-        it "getUpdates" $ do
-            let res = getUpdates 12 345
-            res `shouldBe` ReqSet {method = "getUpdates",
-                    reqParams = [ ("timeout", Just "12")
-                                , ("offset", Just "345")
-                                ] }
-        it "sendMessage" $ do
-            let res = sendMessage 123 "message" False
-            res `shouldBe` ReqSet {method = "sendMessage",
-                    reqParams = [ ("chat_id", Just "123")
-                                , ("text", Just "message")
-                                ] }
-        it "sendMessage with keyboard" $ do
-            let res = sendMessage 123 "message" True
-            res `shouldBe` ReqSet {method = "sendMessage",
-                    reqParams = [ ("chat_id", Just "123")
-                                , ("text", Just "message")
-                                , ("reply_markup", Just $ "{\"one_time_keyboard\":true,"
-                                    <> "\"resize_keyboard\":true,\"selective\":false,"
-                                    <> "\"keyboard\":[[{\"text\":\"1\"},{\"text\":\"2\"},"
-                                    <> "{\"text\":\"3\"},{\"text\":\"4\"},{\"text\":\"5\"}]]}")
-                                ] }
-        it "copyMessage" $ do
-            let res = copyMessage 123 456 789
-            res `shouldBe` ReqSet {method = "copyMessage",
-                    reqParams = [ ("chat_id", Just "123")
-                                , ("from_chat_id", Just "456")
-                                , ("message_id", Just "789")
-                                ] }  
-    describe "TG functions" $ do
-        it "delUpdate" $ do
-            let res = delUpdate testHandle 123
-                mustResp = testResponse {responseResult = []}
-            res `shouldBe` testHandle {response = Just mustResp}
+    describe "Bot functions" $ do
+        it "setCommand to empty users" $ do
+            let res = setCommand testUsersEmpty testUser1
+            res `shouldBe` [testUser1]
+        it "setCommand to user" $ do
+            let res = setCommand testUsers testUser1 {uSentRep = True}
+            res `shouldBe`  [ User "user1" 1 1 True
+                            , User "user2" 2 1 True
+                            ]
+        it "setCommand to new user" $ do
+            let res = setCommand testUsers testUser3
+            res `shouldBe`  [ User "user1" 1 1 False
+                            , User "user2" 2 1 True
+                            , User "user3" 3 3 True
+                            ]
+        it "getCommand" $ do
+            let res = getCommand testUsers 2
+            res `shouldBe` True
+        it "getCommand with existant user" $ do
+            let res = getCommand testUsers 3
+            res `shouldBe` False
+        it "putRepeat" $ do
+            let res = putRepeat testUsers testUser1 {uRep = 2}
+            res `shouldBe`  [ User "user1" 1 2 False
+                            , User "user2" 2 1 True
+                            ]
+        it "putRepeat with new user" $ do
+            let res = putRepeat testUsers testUser3
+            res `shouldBe`  [ User "user1" 1 1 False
+                            , User "user2" 2 1 True
+                            , User "user3" 3 3 True
+                            ]
+        it "getRepeat" $ do
+            let res = getRepeat testUsers 3 2
+            res `shouldBe` 1
+        it "getRepeat with existant user" $ do
+            let res = getRepeat testUsers 2 3
+            res `shouldBe` 2

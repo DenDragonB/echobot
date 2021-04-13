@@ -15,8 +15,7 @@ import           Bot.TG.Methods
 data Config = Config
     { token   :: String
     , timeout :: Integer
-    }
-    deriving Show
+    } deriving (Show, Eq)
 instance A.FromJSON Config where
     parseJSON = A.withObject "FromJSON BotTelegram.Config" $ \o -> Config
         <$> o A..: "token"
@@ -28,8 +27,7 @@ data Handle = Handle
     , hLogger  :: Logger.Handle
     , offset   :: Integer
     , response :: Maybe Response
-    }
-    deriving Show
+    } deriving (Show, Eq)
 
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
 withHandle hLog hBot conf f = f $ Handle conf hBot hLog 0 Nothing

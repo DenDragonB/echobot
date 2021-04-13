@@ -11,6 +11,7 @@ import           Bot.TG.Types
 
 -- Types for creating requests
 data ReqSet = ReqSet {method :: String, reqParams :: [(BS.ByteString,Maybe BS.ByteString)]}
+    deriving (Show, Eq)
 
 getResponseFromAPI :: String -> ReqSet -> IO BS.ByteString
 getResponseFromAPI token settings = do

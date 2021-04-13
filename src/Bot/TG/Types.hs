@@ -8,8 +8,7 @@ import           Data.Aeson
 data Response = Response 
     { responseOk :: Bool
     , responseResult :: [Update] 
-    }
-    deriving Show
+    } deriving (Show, Eq)
 instance FromJSON Response where
     parseJSON = withObject "FromJSON TG.Types.Response" $ \o -> 
         Response <$> o .: "ok"

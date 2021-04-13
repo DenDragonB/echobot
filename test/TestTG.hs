@@ -1,19 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
-module TestVK where
+module TestTG where
 
 import Test.Hspec
 
 import qualified Logger
 import qualified Bot
-import Bot.VK
+import Bot.TG
 import Bot.TG.Types
 import Bot.TG.Methods
 
 testConfig :: Config
 testConfig = Config
     { token     = "1a2bc3"
-    , groupVKId = 123
-    , timeout   = 25
+    , timeout   = 60
     }
 
 testHandle :: Handle
@@ -36,121 +35,56 @@ testHandle = Handle
             , Logger.logMinLevel = Logger.Debug 
             }
         }
-    , server   = LPServer 
-        { sAddres = "serverADDR"
-        , key     = "token"
-        , startTs = "ts1"
-        }
-    , offset   = "25"
+    , offset   = 25
     , response = Just testResponse
     }
 
 testResponse :: Response
-testResponse = Response 
-    { ts      = "ts2"
-    , updates = [testUpdate]
+testResponse = Response
+    { responseOk = True
+    , responseResult = [testUpdate]
     }
 
 testUpdate :: Update
-testUpdate = Update 
-    { upType    = MessageNew 
-    , upObject  = Just testObjectMessageNew
-    , upGroupID = 123
-    , eventId   = "event123"
+testUpdate = UpMessge
+    { updateId = 123
+    , message = Nothing
     }
-
-testObjectMessageNew :: ObjMEssageNew
-testObjectMessageNew = ObjMEssageNew 
-    { message = ObjMessage
-        { mesId = 456
-        , fromID = 789
-        , text = "objectMessage" 
-        , attach = testAttachments
-        }
-    }
-
-testAttachments :: [Attachment]
-testAttachments =   
-    [ AtMedia {aType = "photo", media = 
-        Media   { objectId = 1234 
-                , ownerId = 5678
-                , access_key = "accesskey" 
-                } }
-    , AtMedia {aType = "audio", media = 
-        Media   { objectId = 1234 
-                , ownerId = 5678
-                , access_key = "" 
-                } }
-    , AtLink {aType = "link", link = 
-        Link    { url = "url" 
-                , title = "title"
-                } }
-    , AtSticker { aType = "sticker", sticker =
-        Sticker { prodID = 12345
-                , stickID = 6789
-                } } 
-    ]
 
 main :: IO ()
 main = hspec $ do
-    describe "VK API methods" $ do
-        it "getServer" $ do
-            let res = getServer testConfig
-            res `shouldBe` ReqSet {method = "groups.getLongPollServer",
-                    reqParams = [ ("group_id", Just "123")
-                                , ("access_token", Just "1a2bc3")
-                                , ("v",  Just "5.130")
+    describe "TG API methods" $ do
+        it "getUpdates" $ do
+            let res = getUpdates 12 345
+            res `shouldBe` ReqSet {method = "getUpdates",
+                    reqParams = [ ("timeout", Just "12")
+                                , ("offset", Just "345")
                                 ] }
         it "sendMessage" $ do
-            let res = sendMessage testConfig 235 55555 "message" False
-            res `shouldBe` ReqSet {method = "messages.send",
-                    reqParams = [ ("group_id", Just "123")
-                                , ("user_id", Just "235")
-                                , ("random_id", Just "55555")
-                                , ("message", Just "message")
-                                , ("access_token", Just "1a2bc3")
-                                , ("v",  Just "5.130")
+            let res = sendMessage 123 "message" False
+            res `shouldBe` ReqSet {method = "sendMessage",
+                    reqParams = [ ("chat_id", Just "123")
+                                , ("text", Just "message")
                                 ] }
         it "sendMessage with keyboard" $ do
-            let res = sendMessage testConfig 235 55555 "message" True
-            res `shouldBe` ReqSet {method = "messages.send",
-                    reqParams = [ ("group_id", Just "123")
-                                , ("user_id", Just "235")
-                                , ("random_id", Just "55555")
-                                , ("message", Just "message")
-                                , ("access_token", Just "1a2bc3")
-                                , ("v",  Just "5.130")
-                                , ("keyboard",  Just $ "{\"buttons\":["
-                                    <> "[{\"color\":\"primary\",\"action\":"
-                                    <> "{\"payload\":\"\",\"type\":\"text\","
-                                    <> "\"label\":\"1\"}},{\"color\":\"primary\","
-                                    <> "\"action\":{\"payload\":\"\",\"type\":"
-                                    <> "\"text\",\"label\":\"2\"}},{\"color\":"
-                                    <> "\"primary\",\"action\":{\"payload\":\"\","
-                                    <> "\"type\":\"text\",\"label\":\"3\"}},"
-                                    <> "{\"color\":\"primary\",\"action\":{"
-                                    <> "\"payload\":\"\",\"type\":\"text\",\"label\":"
-                                    <> "\"4\"}},{\"color\":\"primary\",\"action\":{"
-                                    <> "\"payload\":\"\",\"type\":\"text\",\"label\":"
-                                    <> "\"5\"}}]],\"inline\":false,\"one_time\":true}")
+            let res = sendMessage 123 "message" True
+            res `shouldBe` ReqSet {method = "sendMessage",
+                    reqParams = [ ("chat_id", Just "123")
+                                , ("text", Just "message")
+                                , ("reply_markup", Just $ "{\"one_time_keyboard\":true,"
+                                    <> "\"resize_keyboard\":true,\"selective\":false,"
+                                    <> "\"keyboard\":[[{\"text\":\"1\"},{\"text\":\"2\"},"
+                                    <> "{\"text\":\"3\"},{\"text\":\"4\"},{\"text\":\"5\"}]]}")
                                 ] }
         it "copyMessage" $ do
-            let res = copyMessage testConfig testObjectMessageNew 235 55555 "message"
-            res `shouldBe` ReqSet {method = "messages.send",
-                    reqParams = [ ("group_id", Just "123")
-                                , ("user_id", Just "235")
-                                , ("random_id", Just "55555")
-                                , ("message", Just "message")
-                                , ("access_token", Just "1a2bc3")
-                                , ("v",  Just "5.130")
-                                , ("attachment",  Just $ "photo5678_1234_accesskey"
-                                                      <> ",audio5678_1234"
-                                                      <> ",linkurl_title"
-                                                      <> ",")
-                                , ("sticker_id",  Just "6789")
+            let res = copyMessage 123 456 789
+            res `shouldBe` ReqSet {method = "copyMessage",
+                    reqParams = [ ("chat_id", Just "123")
+                                , ("from_chat_id", Just "456")
+                                , ("message_id", Just "789")
                                 ] }  
-    describe "VK functions" $ do
+    describe "TG functions" $ do
         it "delUpdate" $ do
-            let res = delUpdate testHandle "event123"
-                mustResp = testResponse {updates = []}
+            let res = delUpdate testHandle 123
+                mustResp = testResponse {responseResult = []}
             res `shouldBe` testHandle {response = Just mustResp}
