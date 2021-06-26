@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Bot.VK.Methods 
+module Bot.VK.Methods
     ( ReqSet (..)
 -- functions to send request to vk servers
     , getResponseFromAPI
@@ -10,17 +10,17 @@ module Bot.VK.Methods
     , getServer
     , sendMessage
     , copyMessage
-  
+
     ) where
 
-import qualified Network.HTTP.Simple as HTTP
-import qualified Data.ByteString.UTF8 as BS
-import qualified Data.ByteString.Lazy as BSLazy (toStrict)
-import           Data.Aeson (encode)
 import           Bot.VK.Types
+import           Data.Aeson           (encode)
+import qualified Data.ByteString.Lazy as BSLazy (toStrict)
+import qualified Data.ByteString.UTF8 as BS
+import qualified Network.HTTP.Simple  as HTTP
 
 -- Types for creating requests
-data ReqSet = ReqSet { method :: String
+data ReqSet = ReqSet { method    :: String
                      , reqParams :: [(BS.ByteString,Maybe BS.ByteString)]} deriving (Show,Eq)
 
 getResponseFromAPI :: ReqSet -> IO BS.ByteString
@@ -28,18 +28,18 @@ getResponseFromAPI settings = do
     let request
             = HTTP.setRequestMethod (BS.fromString "GET")
             $ HTTP.setRequestHost   (BS.fromString "api.vk.com")
-            $ HTTP.setRequestPort   (443)
-            $ HTTP.setRequestSecure (True)
+            $ HTTP.setRequestPort   443
+            $ HTTP.setRequestSecure True
             $ HTTP.setRequestPath   (BS.fromString $ "/method/" ++ method settings)
             $ HTTP.setRequestQueryString (reqParams settings)
-            $ HTTP.defaultRequest
+            HTTP.defaultRequest
     res <- HTTP.httpBS request
     return (HTTP.getResponseBody res)
 
 getUpdates :: LongPollServer -> Integer -> String -> IO BS.ByteString
-getUpdates server wait ts = do 
-    request <- HTTP.parseRequest $ 
-        sAddres server ++ "?act=a_check&key=" ++ key server ++ 
+getUpdates server wait ts = do
+    request <- HTTP.parseRequest $
+        sAddres server ++ "?act=a_check&key=" ++ key server ++
         "&ts=" ++ ts ++ "&wait=" ++ show wait
     res <- HTTP.httpBS request
     return (HTTP.getResponseBody res)
@@ -63,30 +63,30 @@ sendMessage Config {..} user rnd msg kb = ReqSet {method = "messages.send",
                 ] <> sendKB kb}
 
 sendKB :: Bool -> [(BS.ByteString, Maybe BS.ByteString)]
-sendKB flag = if not flag then []
-    else [(BS.fromString "keyboard",  Just $ BSLazy.toStrict $ encode keyboardForRep)]
+sendKB flag = [(BS.fromString "keyboard",  Just $ BSLazy.toStrict $ encode keyboardForRep)
+    | flag]
 
 keyboardForRep :: Keyboard
-keyboardForRep = Keyboard 
+keyboardForRep = Keyboard
     { oneTime = True
     , buttons = [
-        [ Button { butAction = ButText { bType = "text" 
+        [ Button { butAction = ButText { bType = "text"
                                        , bLabel = "1"
                                        , payload = ""}
                  , butColor = PrimaryB }
-        , Button { butAction = ButText { bType = "text" 
+        , Button { butAction = ButText { bType = "text"
                                        , bLabel = "2"
                                        , payload = ""}
                  , butColor = PrimaryB }
-        , Button { butAction = ButText { bType = "text" 
+        , Button { butAction = ButText { bType = "text"
                                        , bLabel = "3"
                                        , payload = ""}
                  , butColor = PrimaryB }
-        , Button { butAction = ButText { bType = "text" 
+        , Button { butAction = ButText { bType = "text"
                                        , bLabel = "4"
                                        , payload = ""}
                  , butColor = PrimaryB }
-        , Button { butAction = ButText { bType = "text" 
+        , Button { butAction = ButText { bType = "text"
                                        , bLabel = "5"
                                        , payload = ""}
                  , butColor = PrimaryB }
@@ -95,19 +95,19 @@ keyboardForRep = Keyboard
     }
 
 copyMessage :: Config -> ObjMEssageNew -> Integer -> Integer -> String -> ReqSet
-copyMessage conf mes user rnd msg = 
+copyMessage conf mes user rnd msg =
     let req = sendMessage conf user rnd msg False
         param = reqParams req
     in req {reqParams = param <> attachToReq mes <> stickToReq mes}
 
 attachToReq :: ObjMEssageNew -> [(BS.ByteString, Maybe BS.ByteString)]
-attachToReq ObjMEssageNew {..} = 
-    case attach message of 
+attachToReq ObjMEssageNew {..} =
+    case attach message of
         [] -> []
         _  -> [(BS.fromString "attachment", Just $ BS.fromString st)]
-                    where 
+                    where
                         st = atString $ attach message
-        
+
 atString :: [Attachment] -> String
 atString [a]    = str a
 atString (a:as) = str a <> "," <> atString as
@@ -116,7 +116,7 @@ atString _      = ""
 str :: Attachment -> String
 str AtMedia {..} = case access_key media of
             "" -> aType <> (show . ownerId) media <> "_" <> (show . objectId) media
-            _  -> aType <> (show . ownerId) media <> "_" <> 
+            _  -> aType <> (show . ownerId) media <> "_" <>
                            (show . objectId) media <> "_" <> access_key media
 str AtSticker {} = ""
 str AtLink {..}    = aType <> url link <> "_" <> title link
@@ -124,12 +124,12 @@ str AtLink {..}    = aType <> url link <> "_" <> title link
 stickToReq :: ObjMEssageNew -> [(BS.ByteString, Maybe BS.ByteString)]
 stickToReq ObjMEssageNew {..} = foldr stickString [] $ attach message
 
-stickString :: Attachment 
-            -> [(BS.ByteString, Maybe BS.ByteString)] 
+stickString :: Attachment
             -> [(BS.ByteString, Maybe BS.ByteString)]
-stickString AtSticker {..} _ = 
+            -> [(BS.ByteString, Maybe BS.ByteString)]
+stickString AtSticker {..} _ =
     [(BS.fromString "sticker_id",  Just $ BS.fromString $ show $ stickID sticker)]
 stickString _ sts = sts
 
-        
-    
+
+

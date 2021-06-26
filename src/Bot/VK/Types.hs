@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -10,7 +11,7 @@ instance FromJSON RespServer where
     parseJSON = withObject "FromJSON VK.Types.Response of Server" $ \o -> RespServer
         <$> o .: "response"
 
-data LongPollServer = LPServer 
+data LongPollServer = LPServer
     { sAddres :: String
     , key     :: String
     , startTs :: String
@@ -40,7 +41,7 @@ instance FromJSON Response where
         <$> o .: "ts"
         <*> o .: "updates"
 
-data Update = Update { upType    :: UpType 
+data Update = Update { upType    :: UpType
                      , upObject  :: Maybe ObjMEssageNew
                      , upGroupID :: Integer
                      , eventId   :: String
@@ -53,7 +54,7 @@ instance FromJSON Update where
         case uType of
             MessageNew -> do
                 Just uObj <- upd .: "object"
-                return Update  { upType    = uType 
+                return Update  { upType    = uType
                                , upObject  = Just uObj
                                , upGroupID = uGroup
                                , eventId   = uEvent
@@ -61,26 +62,25 @@ instance FromJSON Update where
             _ -> return Update { upType   = uType
                                , upGroupID = uGroup
                                , eventId   = uEvent
-                               , upObject  = Nothing 
+                               , upObject  = Nothing
                                }
 
 
 data UpType = MessageNew | MessageEvent | TypeUnknown deriving (Show,Eq)
 instance FromJSON UpType where
-    parseJSON = withText "FromJSON VK.Types.UpType" $ \s ->
-        case s of
-            "message_new"    -> return MessageNew
-            "message_event"  -> return MessageEvent
-            _                -> return TypeUnknown
+    parseJSON = withText "FromJSON VK.Types.UpType" $ \case
+        "message_new"   -> return MessageNew
+        "message_event" -> return MessageEvent
+        _               -> return TypeUnknown
 
 newtype ObjMEssageNew = ObjMEssageNew { message :: ObjMessage} deriving (Show,Eq)
 instance FromJSON ObjMEssageNew where
     parseJSON = withObject "FromJSON VK.Types.UpObject" $ \o -> ObjMEssageNew
         <$> o .: "message"
 
-data ObjMessage = ObjMessage { mesId :: Integer
+data ObjMessage = ObjMessage { mesId  :: Integer
                              , fromID :: Integer
-                             , text :: String 
+                             , text   :: String
                              , attach :: [Attachment]
                              } deriving (Show,Eq)
 instance FromJSON ObjMessage where
@@ -92,8 +92,8 @@ instance FromJSON ObjMessage where
 
 
 data Attachment  = AtMedia { aType :: String, media :: Media }
-                 | AtLink { aType :: String, link :: Link } 
-                 | AtSticker { aType :: String, sticker :: Sticker } 
+                 | AtLink { aType :: String, link :: Link }
+                 | AtSticker { aType :: String, sticker :: Sticker }
                  deriving (Show,Eq)
 instance FromJSON Attachment where
     parseJSON = withObject "FromJSON VK.Types.Attachment" $ \attach -> do
@@ -135,9 +135,9 @@ instance FromJSON Attachment where
                 return $ AtMedia "gift" aGift
             Just a -> fail $ "FromJSON VK.Types.Attachment: unknown attachment " <> a
 
-data Media = Media { objectId   :: Integer 
+data Media = Media { objectId   :: Integer
                    , ownerId    :: Integer
-                   , access_key :: String 
+                   , access_key :: String
                    } deriving (Show,Eq)
 instance FromJSON Media where
     parseJSON = withObject "FromJSON VK.Types.Media" $ \o -> do
@@ -146,8 +146,8 @@ instance FromJSON Media where
         return $ Media mid moid ""
 
 
-data Link = Link { url   :: String 
-                 , title :: String 
+data Link = Link { url   :: String
+                 , title :: String
                  } deriving (Show,Eq)
 instance FromJSON Link where
     parseJSON = withObject "FromJSON VK.Types.Link" $ \o -> Link
@@ -176,7 +176,7 @@ instance ToJSON Keyboard where
                              , "buttons"  .= buttons keyboard
                              , "inline"   .= inline keyboard
                              ]
-        
+
 data Button = Button { butAction :: ButAction
                      , butColor  :: ButColor
                      } deriving Show
@@ -191,7 +191,7 @@ instance ToJSON Button where
 
 data ButColor = PrimaryB             -- синяя кнопка, обозначает основное действие. #5181B8
               | SecondaryB           -- обычная белая кнопка. #FFFFFF
-              | NegativeB            -- опасное действие, или отрицательное действие 
+              | NegativeB            -- опасное действие, или отрицательное действие
                                      -- (отклонить, удалить и тд). #E64646
               | PositiveB            -- согласиться, подтвердить. #4BB34B
 instance Show ButColor where
@@ -200,23 +200,22 @@ instance Show ButColor where
     show NegativeB  = "negative"
     show PositiveB  = "positive"
 instance FromJSON ButColor where
-    parseJSON = withText "VK.Types.ButColor" $ \s ->
-        case s of
-            "primary"    -> return PrimaryB
-            "secondary"  -> return SecondaryB
+    parseJSON = withText "VK.Types.ButColor" $ \case
+            "primary"   -> return PrimaryB
+            "secondary" -> return SecondaryB
             "negative"  -> return NegativeB
             "positive"  -> return PositiveB
-            _            -> fail $ "Unknown color for button"
+            _           -> fail "Unknown color for button"
 instance ToJSON ButColor where
     toJSON PrimaryB   = "primary"
     toJSON SecondaryB = "secondary"
     toJSON NegativeB  = "negative"
     toJSON PositiveB  = "positive"
 
-data ButAction = ButText { bType   :: String 
+data ButAction = ButText { bType   :: String
                          , bLabel  :: String
                          , payload :: String
-                         } 
+                         }
                | ButOther { bType   :: String }
                deriving Show
 instance FromJSON ButAction where
@@ -235,4 +234,4 @@ instance ToJSON ButAction where
                                  ]
     toJSON ButOther {..} = object [ "type" .= bType ]
 
-    
+

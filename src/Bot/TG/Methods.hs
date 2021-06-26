@@ -2,9 +2,9 @@
 
 module Bot.TG.Methods where
 
-import           Data.Aeson (encode)
-import qualified Data.ByteString.UTF8 as BS
+import           Data.Aeson           (encode)
 import qualified Data.ByteString.Lazy as BSLazy (toStrict)
+import qualified Data.ByteString.UTF8 as BS
 import           Network.HTTP.Simple
 
 import           Bot.TG.Types
@@ -18,11 +18,11 @@ getResponseFromAPI token settings = do
     let request
             = setRequestMethod (BS.fromString "GET")
             $ setRequestHost   (BS.fromString "api.telegram.org")
-            $ setRequestPort   (443)
-            $ setRequestSecure (True)
+            $ setRequestPort   443
+            $ setRequestSecure True
             $ setRequestPath   (BS.fromString $ "/bot" ++ token ++ "/" ++ method settings)
             $ setRequestQueryString (reqParams settings)
-            $ defaultRequest
+            defaultRequest
     res <- httpBS request
     return (getResponseBody res)
 
@@ -36,15 +36,15 @@ getUpdates timeout offset = ReqSet {method = "getUpdates",
 sendMessage :: Integer -> String -> Bool -> ReqSet
 sendMessage chatID text isKB =  ReqSet {method = "sendMessage",
                 reqParams = [ (BS.fromString "chat_id", Just $ BS.fromString $ show chatID)
-                            , (BS.fromString "text", Just $ BS.fromString $ text)
+                            , (BS.fromString "text", Just $ BS.fromString text)
                             ] <> addKB isKB}
 
 addKB :: Bool -> [(BS.ByteString,Maybe BS.ByteString)]
-addKB isKB = 
+addKB isKB =
     [(BS.fromString "reply_markup", Just $ BSLazy.toStrict $ encode keyboard) | isKB]
 
 keyboard :: TGReplyKeyboardMarkup
-keyboard = TGKeyBoard 
+keyboard = TGKeyBoard
                 [[TGButton "1",TGButton "2",TGButton "3",TGButton "4",TGButton "5"]]
                 True
                 True
@@ -55,4 +55,4 @@ copyMessage chatID fromChatID messageID = ReqSet {method = "copyMessage",
             reqParams = [ (BS.fromString "chat_id", Just $ BS.fromString $ show chatID)
                         , (BS.fromString "from_chat_id", Just $ BS.fromString $ show fromChatID)
                         , (BS.fromString "message_id", Just $ BS.fromString $ show messageID)
-                        ] }                                    
+                        ] }

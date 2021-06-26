@@ -5,17 +5,17 @@ module Bot.TG.Types where
 import           Data.Aeson
 
 -- Type of Response from Telegram bots API
-data Response = Response 
-    { responseOk :: Bool
-    , responseResult :: [Update] 
+data Response = Response
+    { responseOk     :: Bool
+    , responseResult :: [Update]
     } deriving (Show, Eq)
 instance FromJSON Response where
-    parseJSON = withObject "FromJSON TG.Types.Response" $ \o -> 
+    parseJSON = withObject "FromJSON TG.Types.Response" $ \o ->
         Response <$> o .: "ok"
                  <*> o .: "result"
 
 -- Type of Update response as describing in Telegram bots API
-data Update = UpMessge 
+data Update = UpMessge
     { updateId :: Integer
     , message  :: Maybe Мessage
     } deriving (Show, Eq)
@@ -26,11 +26,11 @@ instance FromJSON Update where
         return $ UpMessge upid uptype
 
 -- Type of Message as describing in Telegram bots API
-data Мessage = Мessage 
-    { messageId :: Integer
+data Мessage = Мessage
+    { messageId   :: Integer
     , messageChat :: TGChat
     , messageDate :: Integer
-    , messageFrom :: Maybe TGUser    
+    , messageFrom :: Maybe TGUser
     , messageText :: Maybe String
     } deriving (Show, Eq)
 instance FromJSON Мessage where
@@ -43,22 +43,22 @@ instance FromJSON Мessage where
         return $ Мessage mid mchat mdate mfrom mtext
 
 -- Type of User as describing in Telegram bots API, added IsBot and Language fields
-data TGUser = TGUser 
-    { tgUserId :: Integer
+data TGUser = TGUser
+    { tgUserId   :: Integer
     , tgUserName :: String
     } deriving (Show, Eq)
 instance FromJSON TGUser where
-    parseJSON = withObject "FromJSON TG.Types.TGUser" $ \o -> 
+    parseJSON = withObject "FromJSON TG.Types.TGUser" $ \o ->
         TGUser <$> o .: "id"
-               <*> o .: "username"                  
+               <*> o .: "username"
 
 -- Type of Chat as describing in Telegram bots API
-data TGChat = TGChat 
+newtype TGChat = TGChat
     { tgChatId :: Integer
     } deriving (Show, Eq)
 instance FromJSON TGChat where
-    parseJSON = withObject "FromJSON TG.Types.TGChat" $ \o -> 
-        TGChat <$> o .: "id"                  
+    parseJSON = withObject "FromJSON TG.Types.TGChat" $ \o ->
+        TGChat <$> o .: "id"
 
 -- Type of custom Keyboard as describing in Telegram bots API
 data TGReplyKeyboardMarkup = TGKeyBoard
@@ -79,14 +79,14 @@ instance ToJSON TGReplyKeyboardMarkup where
                              , "resize_keyboard"   .= tgKBResize keyboard
                              , "one_time_keyboard" .= tgKBOneTime keyboard
                              , "selective"         .= tgKBSelective keyboard
-                             ]    
+                             ]
 
-data TGButton = TGButton
+newtype TGButton = TGButton
     { tgButtonText :: String
     } deriving (Show, Eq)
 instance FromJSON TGButton where
-    parseJSON = withObject "FromJSON TG.Types.TGButton" $ \o -> 
-        TGButton <$> o .: "text" 
+    parseJSON = withObject "FromJSON TG.Types.TGButton" $ \o ->
+        TGButton <$> o .: "text"
 instance ToJSON TGButton where
     toJSON button = object [ "text" .= tgButtonText button
                            ]

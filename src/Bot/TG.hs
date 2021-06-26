@@ -3,14 +3,14 @@
 
 module Bot.TG where
 
-import qualified Data.Aeson as A
-import           Data.Maybe (fromMaybe, isJust)
-import           Control.Monad (foldM,replicateM_)
+import           Control.Monad  (foldM, replicateM_)
+import qualified Data.Aeson     as A
+import           Data.Maybe     (fromMaybe, isJust)
 
-import qualified Logger
 import qualified Bot
-import           Bot.TG.Types
 import           Bot.TG.Methods
+import           Bot.TG.Types
+import qualified Logger
 
 data Config = Config
     { token   :: String
@@ -38,12 +38,12 @@ setRepeat handle@Handle {..} = do
         Nothing -> return handle
         Just resp -> do
             let updates = filter (isJust . message) $ responseResult resp
-            let needSet = filter 
+            let needSet = filter
                     (\u -> fromMaybe "" (message u >>= messageText) `elem` ["1","2","3","4","5"] &&
-                        Bot.getCommand 
+                        Bot.getCommand
                             (Bot.users hBot)
                             (maybe 0 tgUserId (message u >>= messageFrom))) updates
-            foldM setter handle needSet 
+            foldM setter handle needSet
 
 setter :: Handle -> Update -> IO Handle
 setter handle@Handle {..} UpMessge {..} = do
@@ -51,9 +51,9 @@ setter handle@Handle {..} UpMessge {..} = do
         Nothing -> return handle
         Just us -> do
             let msg = fromMaybe (show $ Bot.repeatDefault $ Bot.hConfig hBot) (message >>= messageText)
-            let newUsers = Bot.putRepeat 
-                    (Bot.users hBot) 
-                    (Bot.User 
+            let newUsers = Bot.putRepeat
+                    (Bot.users hBot)
+                    (Bot.User
                             { uName = tgUserName us
                             , uID = tgUserId us
                             , uRep = read msg
@@ -77,15 +77,15 @@ sendRepeat handle@Handle {..} = do
 
 senderRep :: Handle -> Update -> IO Handle
 senderRep handle@Handle {..} up = do
-            let user = Bot.User 
-                            { Bot.uName = maybe "" tgUserName (message up >>= messageFrom) 
+            let user = Bot.User
+                            { Bot.uName = maybe "" tgUserName (message up >>= messageFrom)
                             , Bot.uID = maybe 0 tgUserId (message up >>= messageFrom)
                             , Bot.uRep = Bot.repeatDefault $ Bot.hConfig hBot
-                            , Bot.uSentRep = True 
+                            , Bot.uSentRep = True
                             }
             let repHandle = handle {hBot = hBot {Bot.users = Bot.setCommand (Bot.users hBot) user}}
             let repMessage = Bot.repeatText1 (Bot.hConfig hBot)
-                    ++ show (Bot.getRepeat 
+                    ++ show (Bot.getRepeat
                                 (Bot.users hBot)
                                 (Bot.repeatDefault $ Bot.hConfig hBot)
                                 (maybe 0 tgUserId (message up >>= messageFrom))) ++ "\r\n"
@@ -122,7 +122,7 @@ getResponse handle@Handle {..} = do
                 [] -> return handle { response = resp }
                 ups -> do
                     let oset = 1 + updateId (last ups)
-                    return handle { response = resp 
+                    return handle { response = resp
                                   , offset = oset}
 
 repeatMessage :: Handle -> IO Handle
@@ -145,26 +145,26 @@ sender kb rep textMes textLog handle@Handle {..} UpMessge {..} = do
                             else Bot.getRepeat
                                     (Bot.users hBot)
                                     (Bot.repeatDefault $ Bot.hConfig hBot)
-                                    (tgUserId us) 
+                                    (tgUserId us)
                     let msg = case textMes of
                             "" -> fromMaybe "" $ messageText mes
                             _  -> textMes
                     replicateM_ repeats $ do
                         _ <- getResponseFromAPI
-                                (token hConfig) 
-                                (sendMessage 
+                                (token hConfig)
+                                (sendMessage
                                     (tgChatId $ messageChat mes)
                                     msg
                                     kb)
                         return ()
-                    Logger.info hLogger $ "Sent message " ++ textLog ++ 
+                    Logger.info hLogger $ "Sent message " ++ textLog ++
                             " to " ++ tgUserName us ++
                             " " ++ show repeats ++ " times"
                     let newHandle = delUpdate handle updateId
                     return newHandle
 
 todo :: Handle -> IO Handle
-todo handle = 
+todo handle =
     getResponse handle >>=
     sendHelp >>=
     sendRepeat >>=

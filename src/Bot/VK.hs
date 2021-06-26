@@ -3,14 +3,14 @@
 
 module Bot.VK where
 
-import qualified Data.Aeson as A
-import           Control.Monad (foldM,replicateM_)
-import           Data.Time.Clock 
+import           Control.Monad   (foldM, replicateM_)
+import qualified Data.Aeson      as A
+import           Data.Time.Clock
 
-import qualified Logger
 import qualified Bot
-import           Bot.VK.Types
 import           Bot.VK.Methods
+import           Bot.VK.Types
+import qualified Logger
 
 
 data Handle = Handle
@@ -40,7 +40,7 @@ copyNewMessage handle@Handle {..} = do
         Nothing -> return handle
         Just resp -> do
             let newUpdates = filter (\u -> upType u == MessageNew) $ updates resp
-            foldM copier handle newUpdates    
+            foldM copier handle newUpdates
 
 copier :: Handle -> Update -> IO Handle
 copier handle@Handle {..} Update {..} = do
@@ -50,7 +50,7 @@ copier handle@Handle {..} Update {..} = do
             let repeats = Bot.getRepeat
                             (Bot.users hBot)
                             (Bot.repeatDefault $ Bot.hConfig hBot)
-                            (fromID $ message obj) 
+                            (fromID $ message obj)
             let msg = text $ message obj
             replicateM_ repeats $ do
                 t <- getCurrentTime
@@ -59,11 +59,11 @@ copier handle@Handle {..} Update {..} = do
                             (copyMessage
                             hConfig
                             obj
-                            (fromID $ message obj) 
+                            (fromID $ message obj)
                             rnd
                             msg)
                 Logger.debug hLogger $ show json
-            Logger.info hLogger $ "Sent message ECHO to user id " ++ 
+            Logger.info hLogger $ "Sent message ECHO to user id " ++
                           show (fromID $ message obj) ++
                           " " ++ show repeats ++ " times"
             let newHandle = delUpdate handle eventId
@@ -75,20 +75,20 @@ setRepeat handle@Handle {..} = do
         Nothing -> return handle
         Just resp -> do
             let newUpdates = filter (\u -> upType u == MessageNew) $ updates resp
-            let needSet = filter 
+            let needSet = filter
                     (\u -> case upObject u of
                         Nothing -> False
                         Just obj -> text (message obj) `elem` ["1","2","3","4","5"] &&
                             Bot.getCommand (Bot.users hBot)
                                        (fromID $ message obj)) newUpdates
-            foldM setter handle needSet 
+            foldM setter handle needSet
 
 setter :: Handle -> Update -> IO Handle
 setter handle@Handle {..} Update {..} = do
     case upObject of
         Nothing -> return handle
         Just obj -> do
-            let newUsers = Bot.putRepeat (Bot.users hBot) 
+            let newUsers = Bot.putRepeat (Bot.users hBot)
                                  (Bot.User { uName = ""
                                            , uID = fromID $ message obj
                                            , uRep = read $ text $ message obj
@@ -121,7 +121,7 @@ setCommand handle@Handle {..} upd = do
                         , uSentRep = True }
             let repHandle = handle {hBot = hBot {Bot.users = Bot.setCommand (Bot.users hBot) user}}
             let repMessage = Bot.repeatText1 (Bot.hConfig hBot)
-                     ++ show (Bot.getRepeat 
+                     ++ show (Bot.getRepeat
                                 (Bot.users hBot)
                                 (Bot.repeatDefault $ Bot.hConfig hBot)
                                 (fromID $ message obj)) ++ "\r\n"
@@ -148,12 +148,12 @@ sender kb textMes textLog handle@Handle {..} Update {..} = do
             json <- getResponseFromAPI
                 (sendMessage
                 hConfig
-                (fromID $ message obj) 
+                (fromID $ message obj)
                 rnd
                 textMes
                 kb)
             Logger.debug hLogger $ show json
-            Logger.info hLogger $ "Sent message " ++ textLog ++ 
+            Logger.info hLogger $ "Sent message " ++ textLog ++
                           " to user id " ++ show (fromID $ message obj)
             let newHandle = delUpdate handle eventId
             return newHandle
@@ -175,12 +175,12 @@ getResponse handle@Handle {..} = do
     Logger.debug hLogger $ show resp
     case resp of
         Nothing   -> return handle { response = Nothing }
-        Just r    -> return handle { response = resp 
+        Just r    -> return handle { response = resp
                                    , offset = ts r}
 
 todo :: Handle -> IO Handle
-todo handle = 
-    getResponse handle 
+todo handle =
+    getResponse handle
     >>= sendHelp
     >>= sendRepeat
     >>= setRepeat

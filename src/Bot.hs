@@ -16,7 +16,7 @@ data Config = Config
     deriving (Show,Eq)
 instance A.FromJSON Config where
     parseJSON = A.withObject "FromJSON BotTelegram.Config" $ \o -> Config
-        <$> o A..: "aboutText"   
+        <$> o A..: "aboutText"
         <*> o A..: "helpText"
         <*> o A..: "repeatText1"
         <*> o A..: "repeatText2"
@@ -24,7 +24,7 @@ instance A.FromJSON Config where
 
 data Handle = Handle
     { hConfig :: Config
-    ,  users :: [User]
+    ,  users  :: [User]
     }
     deriving (Show,Eq)
 
@@ -55,7 +55,7 @@ setCommand (u:us) newUser
                                   , uRep     = uRep u
                                   , uSentRep = uSentRep newUser
                                   } : us
-    | otherwise = u : putRepeat us newUser 
+    | otherwise = u : putRepeat us newUser
 
 getCommand :: [User] -> UID -> Bool
 getCommand [] _      = False
@@ -65,7 +65,7 @@ getCommand (u:us) uid | uID u == uid = uSentRep u
 putRepeat :: [User] -> User -> [User]
 putRepeat [] newUser = [newUser]
 putRepeat (u:us) newUser | uID u == uID newUser = newUser : us
-                         | otherwise = u : putRepeat us newUser 
+                         | otherwise = u : putRepeat us newUser
 
 getRepeat :: [User] -> URep -> UID -> URep
-getRepeat us defRep uid = foldr (\u ini -> if uID u == uid then uRep u else ini) defRep us 
+getRepeat us defRep uid = foldr (\u ini -> if uID u == uid then uRep u else ini) defRep us
