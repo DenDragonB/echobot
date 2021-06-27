@@ -3,13 +3,13 @@
 module Main where
 
 import qualified Bot
-import qualified Bot.TG       as TG
-import qualified Bot.VK       as VK
-import qualified Bot.VK.Types as VKTypes
-import qualified Data.Aeson   as Aeson
-import qualified Data.Text    as T
+import qualified Bot.TG          as TG
+import qualified Bot.VK          as VK
+import qualified Bot.VK.Types    as VKTypes
+import qualified Data.Aeson      as Aeson
+import qualified Data.ByteString as BS
+import qualified Data.Yaml       as YAML
 import qualified Logger
-import qualified Text.Toml    as TOML
 
 data Config = Config
     { cLogger :: Logger.Config
@@ -32,10 +32,11 @@ instance Aeson.FromJSON Config where
 main :: IO ()
 main = do
     -- read config
-    tMainConf <- readFile "app/main.conf"
-    tUserConf <- readFile "config.conf"
-    let Right toml = TOML.parseTomlDoc "" $ T.pack $ tUserConf ++ tMainConf
-    let config = Aeson.eitherDecode $ Aeson.encode toml :: Either String Config
+    tMainConf <- BS.readFile "app/main.yaml"
+    tUserConf <- BS.readFile "config.yaml"
+
+    let config = YAML.decodeEither' $  tMainConf <> tUserConf
+
     case config of
         Left str -> print str
         Right conf -> do
