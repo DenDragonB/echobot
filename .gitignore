@@ -3,4 +3,5 @@ aeson-1.5.5.1/
 .stack-work/
 *~
 app/main.conf
+app/main.yaml
 
