@@ -14,14 +14,20 @@ import qualified Logger
 
 
 data Handle = Handle
-    { hConfig  :: Config
-    , hBot     :: Bot.Handle
-    , hLogger  :: Logger.Handle
-    , server   :: LongPollServer
-    , offset   :: String
-    , response :: Maybe Response
+    { hConfig :: Config
+    , hBot    :: Bot.Handle
+    , hLogger :: Logger.Handle
+    , server  :: LongPollServer
+--    , offset   :: String
+--    , response :: Maybe Response
     }
     deriving (Show,Eq)
+
+data State = State
+    { users    :: [Bot.User]
+    , response :: Maybe Response
+    , offset   :: String
+    } deriving (Show,Eq)
 
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
 withHandle hLog hBot conf f = do
@@ -32,23 +38,23 @@ withHandle hLog hBot conf f = do
             Logger.error hLog "No answear from LongPoll server VK"
             return ()
         Just serv -> do
-            f $ Handle conf hBot hLog (getResp serv) (startTs $ getResp serv) Nothing
+            f $ Handle conf hBot hLog (getResp serv) --(startTs $ getResp serv) Nothing
 
-copyNewMessage :: Handle -> IO Handle
-copyNewMessage handle@Handle {..} = do
+copyNewMessage :: Handle -> State -> IO State
+copyNewMessage handle state@State {..} = do
     case response of
-        Nothing -> return handle
+        Nothing -> return state
         Just resp -> do
             let newUpdates = filter (\u -> upType u == MessageNew) $ updates resp
-            foldM copier handle newUpdates
+            foldM (copier handle) state newUpdates
 
-copier :: Handle -> Update -> IO Handle
-copier handle@Handle {..} Update {..} = do
+copier :: Handle -> State -> Update -> IO State
+copier Handle {..} state@State {..} Update {..} = do
     case upObject of
-        Nothing -> return handle
+        Nothing -> return state
         Just obj -> do
             let repeats = Bot.getRepeat
-                            (Bot.users hBot)
+                            users
                             (Bot.repeatDefault $ Bot.hConfig hBot)
                             (fromID $ message obj)
             let msg = text $ message obj
@@ -66,82 +72,81 @@ copier handle@Handle {..} Update {..} = do
             Logger.info hLogger $ "Sent message ECHO to user id " ++
                           show (fromID $ message obj) ++
                           " " ++ show repeats ++ " times"
-            let newHandle = delUpdate handle eventId
-            return newHandle
+            let newState = delUpdate state eventId
+            return newState
 
-setRepeat :: Handle -> IO Handle
-setRepeat handle@Handle {..} = do
+setRepeat :: Handle -> State -> IO State
+setRepeat handle state@State {..} = do
     case response of
-        Nothing -> return handle
+        Nothing -> return state
         Just resp -> do
             let newUpdates = filter (\u -> upType u == MessageNew) $ updates resp
             let needSet = filter
                     (\u -> case upObject u of
                         Nothing -> False
                         Just obj -> text (message obj) `elem` ["1","2","3","4","5"] &&
-                            Bot.getCommand (Bot.users hBot)
+                            Bot.getCommand users
                                        (fromID $ message obj)) newUpdates
-            foldM setter handle needSet
+            foldM (setter handle) state needSet
 
-setter :: Handle -> Update -> IO Handle
-setter handle@Handle {..} Update {..} = do
+setter :: Handle -> State -> Update -> IO State
+setter Handle {..} state@State {..} Update {..} = do
     case upObject of
-        Nothing -> return handle
+        Nothing -> return state
         Just obj -> do
-            let newUsers = Bot.putRepeat (Bot.users hBot)
+            let newUsers = Bot.putRepeat users
                                  (Bot.User { uName = ""
                                            , uID = fromID $ message obj
                                            , uRep = read $ text $ message obj
                                            , uSentRep = False })
             Logger.debug hLogger $ show newUsers
-            let newBot = hBot {Bot.users = newUsers}
-            let newHUsers = handle {hBot = newBot}
+            let newSUsers = state {users = newUsers}
             Logger.info hLogger $ "Set repeat for user id :" ++ (show . fromID . message) obj ++
                           " to " ++ text (message obj)
-            let newHandle = delUpdate newHUsers eventId
-            return newHandle
+            let newState = delUpdate newSUsers eventId
+            return newState
 
-sendRepeat :: Handle -> IO Handle
-sendRepeat handle@Handle {..} = do
+sendRepeat :: Handle -> State -> IO State
+sendRepeat handle state@State {..} = do
     case response of
-        Nothing -> return handle
+        Nothing -> return state
         Just resp -> do
             let newUpdates = filter (\u -> upType u == MessageNew) $ updates resp
             let needRep = filter (\u -> fmap (text . message) (upObject u) == Just "/repeat") newUpdates
-            foldM setCommand handle needRep
+            foldM (setCommand handle) state needRep
 
-setCommand :: Handle -> Update -> IO Handle
-setCommand handle@Handle {..} upd = do
+setCommand :: Handle -> State -> Update -> IO State
+setCommand handle@Handle {..} state@State {..} upd = do
     case upObject upd of
-        Nothing -> return handle
+        Nothing -> return state
         Just obj -> do
             let user = Bot.User { uName = ""
                         , uID = fromID $ message obj
                         , uRep = Bot.repeatDefault $ Bot.hConfig hBot
                         , uSentRep = True }
-            let repHandle = handle {hBot = hBot {Bot.users = Bot.setCommand (Bot.users hBot) user}}
+            let repState = state {users = Bot.setCommand users user}
             let repMessage = Bot.repeatText1 (Bot.hConfig hBot)
                      ++ show (Bot.getRepeat
-                                (Bot.users hBot)
+                                users
                                 (Bot.repeatDefault $ Bot.hConfig hBot)
                                 (fromID $ message obj)) ++ "\r\n"
                     ++ Bot.repeatText2 (Bot.hConfig hBot)
-            sender True repMessage "REPEAT" repHandle upd
+            sender handle True repMessage "REPEAT" repState upd
 
-sendHelp :: Handle -> IO Handle
-sendHelp handle@Handle {..} = do
+sendHelp :: Handle -> State -> IO State
+sendHelp handle@Handle {..} state@State {..} = do
     case response of
-        Nothing -> return handle
+        Nothing -> return state
         Just resp -> do
             let newUpdates = filter (\u -> upType u == MessageNew) $ updates resp
             let needHelp = filter (\u -> fmap (text . message) (upObject u) == Just "/help") newUpdates
             let helpMessage = Bot.helpText $ Bot.hConfig hBot
-            foldM (sender False helpMessage "HELP") handle needHelp
+            foldM (sender handle False helpMessage "HELP") state needHelp
 
-sender :: Bool -> String -> String -> Handle -> Update -> IO Handle
-sender kb textMes textLog handle@Handle {..} Update {..} = do
+sender :: Handle -> Bool -> String -> String -> State -> Update -> IO State
+sender Handle {..} kb textMes textLog state Update {..} = do
     case upObject of
-        Nothing -> return handle
+        Nothing -> return state
         Just obj -> do
             t <- getCurrentTime
             let rnd = diffTimeToPicoseconds (utctDayTime t) `mod` (10 ^ (9 :: Integer))
@@ -155,11 +160,11 @@ sender kb textMes textLog handle@Handle {..} Update {..} = do
             Logger.debug hLogger $ show json
             Logger.info hLogger $ "Sent message " ++ textLog ++
                           " to user id " ++ show (fromID $ message obj)
-            let newHandle = delUpdate handle eventId
-            return newHandle
+            let newState = delUpdate state eventId
+            return newState
 
-delUpdate :: Handle -> String -> Handle
-delUpdate handle@Handle {..} uid = handle {response = newResp} where
+delUpdate :: State -> String -> State
+delUpdate state@State {..} uid = state {response = newResp} where
     newResp = case response of
         Nothing -> response
         Just resp -> let
@@ -167,22 +172,22 @@ delUpdate handle@Handle {..} uid = handle {response = newResp} where
             newUpdate = filter (\u -> eventId u /= uid) ups
             in Just resp {updates = newUpdate}
 
-getResponse :: Handle -> IO Handle
-getResponse handle@Handle {..} = do
+getResponse :: Handle -> State -> IO State
+getResponse Handle {..} state@State {..} = do
     json <- getUpdates server (timeout hConfig) offset
     Logger.debug hLogger $ show json
     let resp = A.decodeStrict json
     Logger.debug hLogger $ show resp
     case resp of
-        Nothing   -> return handle { response = Nothing }
-        Just r    -> return handle { response = resp
-                                   , offset = ts r}
+        Nothing   -> return state { response = Nothing }
+        Just r    -> return state { response = resp
+                                  , offset = ts r}
 
-todo :: Handle -> IO Handle
-todo handle =
-    getResponse handle
-    >>= sendHelp
-    >>= sendRepeat
-    >>= setRepeat
-    >>= copyNewMessage
-    >>= todo
+todo :: Handle -> State -> IO State
+todo handle state =
+    getResponse handle state
+    >>= sendHelp handle
+    >>= sendRepeat handle
+    >>= setRepeat handle
+    >>= copyNewMessage handle
+    >>= todo handle

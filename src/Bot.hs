@@ -22,9 +22,8 @@ instance A.FromJSON Config where
         <*> o A..: "repeatText2"
         <*> o A..: "repeatDefault"
 
-data Handle = Handle
+newtype Handle = Handle
     { hConfig :: Config
-    ,  users  :: [User]
     }
     deriving (Show,Eq)
 
@@ -40,8 +39,9 @@ data User  = User
     }
     deriving (Show,Eq)
 
+
 withHandle :: Config -> (Handle -> IO ()) -> IO ()
-withHandle conf f = f $ Handle conf []
+withHandle conf f = f $ Handle conf --[]
 
 setCommand :: [User] -> User -> [User]
 setCommand [] newUser = [User { uName    = uName newUser

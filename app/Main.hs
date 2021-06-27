@@ -46,9 +46,10 @@ main = do
                     "vk" ->
                         VK.withHandle logger bot (cBotVK conf) $ \handle -> do
                             Logger.debug logger $ show handle
-                            _ <- VK.todo handle
+                            _ <- VK.todo handle $ VK.State [] Nothing
+                                (VKTypes.startTs $ VK.server handle)
                             return ()
                     _ -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
                         Logger.debug logger $ show handle
-                        _ <- TG.todo handle
+                        _ <- TG.todo handle $ TG.State [] Nothing 0
                         return ()
