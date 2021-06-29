@@ -11,7 +11,7 @@ telegram :
 vk :
   # Settings for accessing and sending requests for VK
   token : 
-  groupId : 194661634
+  groupId : 
   # Waiting time for a response from the server, in seconds
   # Since some proxy servers terminate the connection after 30 seconds,
   # we recommend specifying wait=25. The maximum value is 90.
