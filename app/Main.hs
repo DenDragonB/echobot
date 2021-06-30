@@ -34,7 +34,7 @@ main = do
     tMainConf <- BS.readFile "app/main.yaml"
     tUserConf <- BS.readFile "config.yaml"
 
-    let config = YAML.decodeEither' $  tMainConf <> tUserConf
+    let config = YAML.decodeEither' $  tMainConf <> "\n" <> tUserConf
 
     case config of
         Left str -> print str
