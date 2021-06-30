@@ -19,7 +19,6 @@ data Config = Config
     , cBotVK  :: VKTypes.Config
     }
     deriving (Show)
-
 instance Aeson.FromJSON Config where
     parseJSON = Aeson.withObject "FromJSON Main.Config" $ \o ->
         Config
@@ -46,10 +45,10 @@ main = do
                     "vk" ->
                         VK.withHandle logger bot (cBotVK conf) $ \handle -> do
                             Logger.debug logger $ show handle
-                            _ <- VK.todo handle $ VK.State [] Nothing
-                                (VKTypes.startTs $ VK.server handle)
+                            _ <- VK.todo handle $ VK.State Bot.emptyUsers (VK.hServer handle) Nothing
+                                (VKTypes.startTs $ VK.hServer handle)
                             return ()
                     _ -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
                         Logger.debug logger $ show handle
-                        _ <- TG.todo handle $ TG.State [] Nothing 0
+                        _ <- TG.todo handle $ TG.State Bot.emptyUsers Nothing 0
                         return ()

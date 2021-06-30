@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -5,6 +6,7 @@
 module Bot.VK.Types where
 
 import           Data.Aeson
+import           GHC.Generics
 
 newtype RespServer = RespServer {getResp :: LongPollServer} deriving Show
 instance FromJSON RespServer where
@@ -23,23 +25,25 @@ instance FromJSON LongPollServer where
         <*> o .: "ts"
 
 data Config = Config
-    { token     :: String
-    , groupVKId :: Integer
-    , timeout   :: Integer
-    } deriving (Show,Eq)
-instance FromJSON Config where
-    parseJSON = withObject "FromJSON VK.Types.Config" $ \o -> Config
-        <$> o .: "token"
-        <*> o .: "groupId"
-        <*> o .: "timeout"
+    { token   :: String
+    , groupId :: Integer
+    , timeout :: Integer
+    } deriving (Show,Eq,Generic)
+instance FromJSON Config
+
+data Failed = Failed
+    { failed :: Int
+    , fts    :: Maybe String
+    } deriving (Show,Eq,Generic)
+instance FromJSON Failed where
+    parseJSON = withObject "FromJSON VK.Types.Response" $ \o -> Failed
+        <$> o .: "failed"
+        <*> o .: "ts"
 
 data Response = Response { ts      :: String     -- number of last events
                          , updates :: [Update]  -- new events
-                         } deriving (Show,Eq)
-instance FromJSON Response where
-    parseJSON = withObject "FromJSON VK.Types.Response" $ \o -> Response
-        <$> o .: "ts"
-        <*> o .: "updates"
+                         } deriving (Show,Eq,Generic)
+instance FromJSON Response
 
 data Update = Update { upType    :: UpType
                      , upObject  :: Maybe ObjMEssageNew
@@ -73,10 +77,8 @@ instance FromJSON UpType where
         "message_event" -> return MessageEvent
         _               -> return TypeUnknown
 
-newtype ObjMEssageNew = ObjMEssageNew { message :: ObjMessage} deriving (Show,Eq)
-instance FromJSON ObjMEssageNew where
-    parseJSON = withObject "FromJSON VK.Types.UpObject" $ \o -> ObjMEssageNew
-        <$> o .: "message"
+newtype ObjMEssageNew = ObjMEssageNew { message :: ObjMessage} deriving (Show,Eq,Generic)
+instance FromJSON ObjMEssageNew
 
 data ObjMessage = ObjMessage { mesId  :: Integer
                              , fromID :: Integer
@@ -148,11 +150,8 @@ instance FromJSON Media where
 
 data Link = Link { url   :: String
                  , title :: String
-                 } deriving (Show,Eq)
-instance FromJSON Link where
-    parseJSON = withObject "FromJSON VK.Types.Link" $ \o -> Link
-        <$> o .: "url"
-        <*> o .: "title"
+                 } deriving (Show,Eq,Generic)
+instance FromJSON Link
 
 data Sticker = Sticker { prodID  :: Integer
                        , stickID :: Integer

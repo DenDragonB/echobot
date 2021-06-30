@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8011efe9fedcff613e14239e12517582355576740f7642db6605c246b50a086f
+-- hash: 7cd2f15fe51e0ca38153f0a4388ea96616f7e3d90e8b68998cb220d1747361bd
 
 name:           echobot
 version:        0.1.0.0
@@ -45,9 +45,10 @@ library
     , bytestring
     , hspec
     , htoml
-    , http-conduit
+    , http-conduit ==2.3.8
     , text
     , time
+    , unordered-containers
     , utf8-string
     , yaml
   default-language: Haskell2010
@@ -66,9 +67,10 @@ executable echobot-exe
     , echobot
     , hspec
     , htoml
-    , http-conduit
+    , http-conduit ==2.3.8
     , text
     , time
+    , unordered-containers
     , utf8-string
     , yaml
   default-language: Haskell2010
@@ -91,9 +93,10 @@ test-suite echobot-test
     , echobot
     , hspec
     , htoml
-    , http-conduit
+    , http-conduit ==2.3.8
     , text
     , time
+    , unordered-containers
     , utf8-string
     , yaml
   default-language: Haskell2010

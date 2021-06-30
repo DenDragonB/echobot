@@ -5,6 +5,7 @@ module Bot.VK where
 
 import           Control.Monad   (foldM, replicateM_)
 import qualified Data.Aeson      as A
+import           Data.Maybe      (fromMaybe)
 import           Data.Time.Clock
 
 import qualified Bot
@@ -17,28 +18,26 @@ data Handle = Handle
     { hConfig :: Config
     , hBot    :: Bot.Handle
     , hLogger :: Logger.Handle
-    , server  :: LongPollServer
---    , offset   :: String
---    , response :: Maybe Response
+    , hServer :: LongPollServer
     }
     deriving (Show,Eq)
 
 data State = State
-    { users    :: [Bot.User]
+    { users    :: Bot.Users
+    , server   :: LongPollServer
     , response :: Maybe Response
     , offset   :: String
     } deriving (Show,Eq)
 
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
 withHandle hLog hBot conf f = do
-    json <- getResponseFromAPI $ getServer conf
-    let respsrv = A.decodeStrict json :: Maybe RespServer
+    respsrv <- getServerAddress conf
     case respsrv of
         Nothing   -> do
             Logger.error hLog "No answear from LongPoll server VK"
             return ()
         Just serv -> do
-            f $ Handle conf hBot hLog (getResp serv) --(startTs $ getResp serv) Nothing
+            f $ Handle conf hBot hLog serv
 
 copyNewMessage :: Handle -> State -> IO State
 copyNewMessage handle state@State {..} = do
@@ -173,15 +172,48 @@ delUpdate state@State {..} uid = state {response = newResp} where
             in Just resp {updates = newUpdate}
 
 getResponse :: Handle -> State -> IO State
-getResponse Handle {..} state@State {..} = do
+getResponse handle@Handle {..} state@State {..} = do
     json <- getUpdates server (timeout hConfig) offset
     Logger.debug hLogger $ show json
-    let resp = A.decodeStrict json
-    Logger.debug hLogger $ show resp
-    case resp of
-        Nothing   -> return state { response = Nothing }
-        Just r    -> return state { response = resp
-                                  , offset = ts r}
+    case A.decodeStrict json of
+        Just failresp -> case failed failresp of
+            2 -> do
+                Logger.info hLogger "The key expired"
+                getNewServer handle state
+            3 -> do
+                Logger.warning hLogger "Information is lost"
+                getNewServer handle state
+            1 -> do
+                Logger.warning hLogger "The event history is outdated or has been partially lost"
+                return state {offset = fromMaybe "" $ fts failresp
+                             ,response = Nothing}
+            _ -> do
+                Logger.error hLogger "Unknown failed response from VK server"
+                fail "Unknown failed response from VK server"
+        Nothing -> do
+            let resp = A.decodeStrict json
+            Logger.debug hLogger $ show resp
+            case resp of
+                Nothing   -> return state { response = Nothing }
+                Just r    -> return state { response = resp
+                                            , offset = ts r}
+
+getServerAddress :: Config -> IO (Maybe LongPollServer)
+getServerAddress conf = do
+    json <- getResponseFromAPI $ getServer conf
+    return $ getResp <$> A.decodeStrict json
+
+getNewServer :: Handle -> State -> IO State
+getNewServer Handle {..} state = do
+    serv <- getServerAddress hConfig
+    case serv of
+        Nothing   -> do
+            Logger.error hLogger "No answear from LongPoll server VK"
+            fail "No answear from LongPoll server VK"
+        Just srv -> do
+            return state { server = srv
+                        , response = Nothing
+                        , offset = startTs srv}
 
 todo :: Handle -> State -> IO State
 todo handle state =

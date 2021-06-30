@@ -5,7 +5,8 @@ module Bot.TG.Methods where
 import           Data.Aeson           (encode)
 import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 import qualified Data.ByteString.UTF8 as BS
-import           Network.HTTP.Simple
+import qualified Network.HTTP.Simple  as HTTPSimple
+import qualified Network.HTTP.Client.Conduit  as HTTP
 
 import           Bot.TG.Types
 
@@ -16,15 +17,19 @@ data ReqSet = ReqSet {method :: String, reqParams :: [(BS.ByteString,Maybe BS.By
 getResponseFromAPI :: String -> ReqSet -> IO BS.ByteString
 getResponseFromAPI token settings = do
     let request
-            = setRequestMethod (BS.fromString "GET")
-            $ setRequestHost   (BS.fromString "api.telegram.org")
-            $ setRequestPort   443
-            $ setRequestSecure True
-            $ setRequestPath   (BS.fromString $ "/bot" ++ token ++ "/" ++ method settings)
-            $ setRequestQueryString (reqParams settings)
-            defaultRequest
-    res <- httpBS request
-    return (getResponseBody res)
+            = HTTPSimple.setRequestMethod (BS.fromString "GET")
+            $ HTTPSimple.setRequestHost   (BS.fromString "api.telegram.org")
+            $ HTTPSimple.setRequestPort   443
+            $ HTTPSimple.setRequestSecure True
+            $ HTTPSimple.setRequestPath   (BS.fromString $ "/bot" ++ token ++ "/" ++ method settings)
+            $ HTTPSimple.setRequestQueryString (reqParams settings)
+            $ setRequestResponseTimeout HTTP.responseTimeoutNone
+            HTTPSimple.defaultRequest
+    res <- HTTPSimple.httpBS request
+    return (HTTPSimple.getResponseBody res)
+
+setRequestResponseTimeout :: HTTP.ResponseTimeout -> HTTPSimple.Request -> HTTPSimple.Request
+setRequestResponseTimeout x req = req { HTTP.responseTimeout = x }
 
 -- Methods of Telegram API
 getUpdates :: Integer -> Integer -> ReqSet

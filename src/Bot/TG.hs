@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -6,6 +7,7 @@ module Bot.TG where
 import           Control.Monad  (foldM, replicateM_)
 import qualified Data.Aeson     as A
 import           Data.Maybe     (fromMaybe, isJust)
+import           GHC.Generics
 
 import qualified Bot
 import           Bot.TG.Methods
@@ -15,11 +17,8 @@ import qualified Logger
 data Config = Config
     { token   :: String
     , timeout :: Integer
-    } deriving (Show, Eq)
-instance A.FromJSON Config where
-    parseJSON = A.withObject "FromJSON BotTelegram.Config" $ \o -> Config
-        <$> o A..: "token"
-        <*> o A..: "timeout"
+    } deriving (Show, Eq, Generic)
+instance A.FromJSON Config
 
 data Handle = Handle
     { hConfig :: Config
@@ -30,7 +29,7 @@ data Handle = Handle
     } deriving (Show, Eq)
 
 data State = State
-    { users    :: [Bot.User]
+    { users    :: Bot.Users
     , response :: Maybe Response
     , offset   :: Integer
     } deriving (Show, Eq)

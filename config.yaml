@@ -3,7 +3,7 @@
 # What messenger can the bot be used for
 # possible values: tg | vk
 # if undefinde or not response than tg
-startOn : tg
+startOn : vk
 
 user :
   # text showing on start
@@ -17,7 +17,7 @@ user :
     the set number of times
     Possible commands:
     /help - this text
-    /repeat - set the number of repetitions"
+    /repeat - set the number of repetitions
 
   # text for repeat command and default number of repeat
   repeatText1 : |

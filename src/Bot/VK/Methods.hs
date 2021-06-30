@@ -17,7 +17,8 @@ import           Bot.VK.Types
 import           Data.Aeson           (encode)
 import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 import qualified Data.ByteString.UTF8 as BS
-import qualified Network.HTTP.Simple  as HTTP
+import qualified Network.HTTP.Simple  as HTTPSimple
+import qualified Network.HTTP.Client.Conduit  as HTTP
 
 -- Types for creating requests
 data ReqSet = ReqSet { method    :: String
@@ -26,35 +27,39 @@ data ReqSet = ReqSet { method    :: String
 getResponseFromAPI :: ReqSet -> IO BS.ByteString
 getResponseFromAPI settings = do
     let request
-            = HTTP.setRequestMethod (BS.fromString "GET")
-            $ HTTP.setRequestHost   (BS.fromString "api.vk.com")
-            $ HTTP.setRequestPort   443
-            $ HTTP.setRequestSecure True
-            $ HTTP.setRequestPath   (BS.fromString $ "/method/" ++ method settings)
-            $ HTTP.setRequestQueryString (reqParams settings)
-            HTTP.defaultRequest
-    res <- HTTP.httpBS request
-    return (HTTP.getResponseBody res)
+            = HTTPSimple.setRequestMethod (BS.fromString "GET")
+            $ HTTPSimple.setRequestHost   (BS.fromString "api.vk.com")
+            $ HTTPSimple.setRequestPort   443
+            $ HTTPSimple.setRequestSecure True
+            $ HTTPSimple.setRequestPath   (BS.fromString $ "/method/" ++ method settings)
+            $ HTTPSimple.setRequestQueryString (reqParams settings)
+            $ setRequestResponseTimeout HTTP.responseTimeoutNone
+            HTTPSimple.defaultRequest
+    res <- HTTPSimple.httpBS request
+    return (HTTPSimple.getResponseBody res)
+
+setRequestResponseTimeout :: HTTP.ResponseTimeout -> HTTPSimple.Request -> HTTPSimple.Request
+setRequestResponseTimeout x req = req { HTTP.responseTimeout = x }
 
 getUpdates :: LongPollServer -> Integer -> String -> IO BS.ByteString
 getUpdates server wait ts = do
     request <- HTTP.parseRequest $
         sAddres server ++ "?act=a_check&key=" ++ key server ++
         "&ts=" ++ ts ++ "&wait=" ++ show wait
-    res <- HTTP.httpBS request
-    return (HTTP.getResponseBody res)
+    res <- HTTPSimple.httpBS request
+    return (HTTPSimple.getResponseBody res)
 
 -- Methods of Telegram API
 getServer :: Config -> ReqSet
 getServer Config {..} = ReqSet {method = "groups.getLongPollServer",
-    reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupVKId)
+    reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupId)
                 , (BS.fromString "access_token", Just $ BS.fromString token)
                 , (BS.fromString "v",  Just $ BS.fromString "5.130")
                 ] }
 
 sendMessage :: Config -> Integer -> Integer -> String -> Bool -> ReqSet
 sendMessage Config {..} user rnd msg kb = ReqSet {method = "messages.send",
-    reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupVKId)
+    reqParams = [ (BS.fromString "group_id", Just $ BS.fromString $ show groupId)
                 , (BS.fromString "user_id", Just $ BS.fromString $ show user)
                 , (BS.fromString "random_id", Just $ BS.fromString $ show rnd)
                 , (BS.fromString "message", Just $ BS.fromString msg)

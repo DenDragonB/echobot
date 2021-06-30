@@ -27,7 +27,8 @@ dependencies:
 - utf8-string
 - htoml
 - text
-- http-conduit
+- http-conduit == 2.3.8
+- unordered-containers
 - time
 - hspec
 

@@ -1,8 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Bot where
 
-import qualified Data.Aeson as A
+import qualified Data.Aeson          as A
+import           Data.HashMap.Strict as MAP
+import           GHC.Generics
 
 type Token = String
 
@@ -13,14 +15,8 @@ data Config = Config
     , repeatText2   :: String
     , repeatDefault :: URep
     }
-    deriving (Show,Eq)
-instance A.FromJSON Config where
-    parseJSON = A.withObject "FromJSON BotTelegram.Config" $ \o -> Config
-        <$> o A..: "aboutText"
-        <*> o A..: "helpText"
-        <*> o A..: "repeatText1"
-        <*> o A..: "repeatText2"
-        <*> o A..: "repeatDefault"
+    deriving (Show,Eq,Generic)
+instance A.FromJSON Config
 
 newtype Handle = Handle
     { hConfig :: Config
@@ -39,33 +35,23 @@ data User  = User
     }
     deriving (Show,Eq)
 
+type Users = HashMap UID User
+
+emptyUsers :: Users
+emptyUsers = empty
 
 withHandle :: Config -> (Handle -> IO ()) -> IO ()
-withHandle conf f = f $ Handle conf --[]
+withHandle conf f = f $ Handle conf
 
-setCommand :: [User] -> User -> [User]
-setCommand [] newUser = [User { uName    = uName newUser
-                                  , uID      = uID newUser
-                                  , uRep     = uRep newUser
-                                  , uSentRep = uSentRep newUser
-                                  } ]
-setCommand (u:us) newUser
-    | uID u == uID newUser = User { uName    = uName newUser
-                                  , uID      = uID newUser
-                                  , uRep     = uRep u
-                                  , uSentRep = uSentRep newUser
-                                  } : us
-    | otherwise = u : putRepeat us newUser
+setCommand :: Users -> User -> Users
+setCommand users newUser = insert (uID newUser) newUser users
 
-getCommand :: [User] -> UID -> Bool
-getCommand [] _      = False
-getCommand (u:us) uid | uID u == uid = uSentRep u
-                      | otherwise   = getCommand us uid
 
-putRepeat :: [User] -> User -> [User]
-putRepeat [] newUser = [newUser]
-putRepeat (u:us) newUser | uID u == uID newUser = newUser : us
-                         | otherwise = u : putRepeat us newUser
+getCommand :: Users -> UID -> Bool
+getCommand users uid = maybe False uSentRep (MAP.lookup uid users)
 
-getRepeat :: [User] -> URep -> UID -> URep
-getRepeat us defRep uid = foldr (\u ini -> if uID u == uid then uRep u else ini) defRep us
+putRepeat :: Users -> User -> Users
+putRepeat users newUser = insert (uID newUser) newUser users
+
+getRepeat :: Users -> URep -> UID -> URep
+getRepeat users defrep uid = maybe defrep uRep (MAP.lookup uid users)

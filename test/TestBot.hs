@@ -2,6 +2,7 @@
 module TestBot where
 
 import Test.Hspec
+import Data.HashMap.Strict
 
 import Bot
 
@@ -14,11 +15,11 @@ testConfig = Config
     , Bot.repeatDefault = 1
     }
 
-testUsersEmpty :: [User]
-testUsersEmpty = []
+testUsersEmpty :: Users
+testUsersEmpty = empty
 
-testUsers :: [User]
-testUsers = [testUser1,testUser2]
+testUsers :: Users
+testUsers = insert 1 testUser1 $ insert 2 testUser2 empty
 
 testUser1 :: User
 testUser1 = User "user1" 1 1 False
