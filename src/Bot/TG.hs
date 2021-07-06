@@ -37,10 +37,11 @@ data State = State
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
 withHandle hLog hBot conf f = f $ Handle conf hBot hLog -- 0 Nothing
 
-setRepeat :: Handle -> State -> IO State
-setRepeat handle state@State {..} = do
+setRepeat :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)
+setRepeat _ (Left err) = return $ Left err
+setRepeat handle (Right state@State {..}) = do
     case response of
-        Nothing -> return state
+        Nothing -> return $ Right state
         Just resp -> do
             let updates = filter (isJust . message) $ responseResult resp
             let needSet = filter
@@ -48,12 +49,13 @@ setRepeat handle state@State {..} = do
                         Bot.getCommand
                             users
                             (maybe 0 tgUserId (message u >>= messageFrom))) updates
-            foldM (setter handle) state needSet
+            foldM (setter handle) (Right state) needSet
 
-setter :: Handle -> State -> Update -> IO State
-setter Handle {..} state@State {..} UpMessge {..} = do
+setter :: Handle -> Either Bot.Exceptions State -> Update -> IO (Either Bot.Exceptions State)
+setter _ (Left err) _ = return $ Left err
+setter Handle {..} (Right state@State {..}) UpMessge {..} = do
     case message >>= messageFrom of
-        Nothing -> return state
+        Nothing -> return $ Right state
         Just us -> do
             let msg = fromMaybe (show $ Bot.repeatDefault $ Bot.hConfig hBot) (message >>= messageText)
             let newUsers = Bot.putRepeat
@@ -68,19 +70,21 @@ setter Handle {..} state@State {..} UpMessge {..} = do
             Logger.info hLogger $ "Set repeat for " ++ tgUserName us ++
                           " to " ++ msg
             let newState = delUpdate newSUsers updateId
-            return newState
+            return $ Right newState
 
-sendRepeat :: Handle -> State -> IO State
-sendRepeat handle state@State {..} = do
+sendRepeat :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)
+sendRepeat _ (Left err) = return $ Left err
+sendRepeat handle (Right state@State {..}) = do
     case response of
-        Nothing -> return state
+        Nothing -> return $ Right state
         Just resp -> do
             let updates = filter (isJust . message) $ responseResult resp
             let needHelp = filter (\u -> fromMaybe "" (message u >>= messageText) == "/repeat") updates
-            foldM (senderRep handle) state needHelp
+            foldM (senderRep handle) (Right state) needHelp
 
-senderRep :: Handle -> State -> Update -> IO State
-senderRep handle@Handle {..} state@State {..} up = do
+senderRep :: Handle -> Either Bot.Exceptions State -> Update -> IO (Either Bot.Exceptions State)
+senderRep _ (Left err) _ = return $ Left err
+senderRep handle@Handle {..} (Right state@State {..}) up = do
             let user = Bot.User
                             { Bot.uName = maybe "" tgUserName (message up >>= messageFrom)
                             , Bot.uID = maybe 0 tgUserId (message up >>= messageFrom)
@@ -94,17 +98,18 @@ senderRep handle@Handle {..} state@State {..} up = do
                                 (Bot.repeatDefault $ Bot.hConfig hBot)
                                 (maybe 0 tgUserId (message up >>= messageFrom))) ++ "\r\n"
                     ++ Bot.repeatText2 (Bot.hConfig hBot)
-            sender handle True False repMessage "REPEAT" repState up
+            sender handle True False repMessage "REPEAT" (Right repState) up
 
-sendHelp :: Handle -> State -> IO State
-sendHelp handle@Handle {..} state@State {..}= do
+sendHelp :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)
+sendHelp _ (Left err) = return $ Left err
+sendHelp handle@Handle {..} (Right state@State {..}) = do
     case response of
-        Nothing -> return state
+        Nothing -> return $ Right state
         Just resp -> do
             let updates = filter (isJust . message) $ responseResult resp
             let needHelp = filter (\u -> fromMaybe "" (message u >>= messageText) == "/help") updates
             let helpMessage = Bot.helpText $ Bot.hConfig hBot
-            foldM (sender handle False False helpMessage "HELP") state needHelp
+            foldM (sender handle False False helpMessage "HELP") (Right state) needHelp
 
 delUpdate :: State -> Integer -> State
 delUpdate state@State {..} uid = state {response = newResp} where
@@ -114,36 +119,39 @@ delUpdate state@State {..} uid = state {response = newResp} where
             newUpdate = filter (\u -> updateId u /= uid) $ responseResult resp
             in Just resp {responseResult = newUpdate}
 
-getResponse :: Handle -> State -> IO State
+getResponse :: Handle -> State -> IO (Either Bot.Exceptions State)
 getResponse Handle {..} state@State {..} = do
     json <- getResponseFromAPI (token hConfig) $ getUpdates (timeout hConfig) offset
     Logger.debug hLogger $ show json
     let resp = A.decodeStrict json
     case resp of
-        Nothing   -> return state { response = Nothing }
+        Nothing   -> return $ Right state { response = Nothing }
         Just r -> do
             case responseResult r of
-                [] -> return state { response = resp }
+                [] -> return $ Right state { response = resp }
                 ups -> do
                     let oset = 1 + updateId (last ups)
-                    return state { response = resp
+                    return $ Right state { response = resp
                                   , offset = oset}
 
-repeatMessage :: Handle -> State -> IO State
-repeatMessage handle state@State {..} = do
+repeatMessage :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)
+repeatMessage _ (Left err) = return $ Left err
+repeatMessage handle (Right state@State {..}) = do
     case response of
-        Nothing -> return state
+        Nothing -> return $ Right state
         Just resp -> do
             let updates = filter (isJust . message) $ responseResult resp
-            foldM (sender handle False True "" "ECHO") state updates
+            foldM (sender handle False True "" "ECHO") (Right state) updates
 
-sender :: Handle -> Bool -> Bool -> String -> String -> State -> Update -> IO State
-sender Handle {..} kb rep textMes textLog state@State {..} UpMessge {..} = do
+sender :: Handle -> Bool -> Bool -> String -> String -> Either Bot.Exceptions State 
+    -> Update -> IO (Either Bot.Exceptions State)
+sender _ _ _ _ _ (Left err) _ = return $ Left err   
+sender Handle {..} kb rep textMes textLog (Right state@State {..}) UpMessge {..} = do
     case message of
-        Nothing -> return state
+        Nothing -> return $ Right state
         Just mes -> do
             case messageFrom mes of
-                Nothing -> return state
+                Nothing -> return $ Right state
                 Just us -> do
                     let repeats = if not rep then 1
                             else Bot.getRepeat
@@ -165,13 +173,21 @@ sender Handle {..} kb rep textMes textLog state@State {..} UpMessge {..} = do
                             " to " ++ tgUserName us ++
                             " " ++ show repeats ++ " times"
                     let newState = delUpdate state updateId
-                    return newState
+                    return $ Right newState
 
-todo :: Handle -> State -> IO State
+todo :: Handle -> State -> IO (Either Bot.Exceptions State)
 todo handle state =
     getResponse handle state >>=
     sendHelp handle >>=
     sendRepeat handle >>=
     setRepeat handle >>=
-    repeatMessage handle >>=
-    todo handle
+    repeatMessage handle
+
+run :: Handle -> State -> IO ()
+run handle@Handle {..} state = do
+    result <- todo handle state
+    case result of
+        Left err -> do
+            Logger.error hLogger $ show err
+        Right newstate -> run handle newstate
+    

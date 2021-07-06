@@ -31,7 +31,7 @@ instance Aeson.FromJSON Config where
 main :: IO ()
 main = do
     -- read config
-    tMainConf <- BS.readFile "app/main.yaml"
+    tMainConf <- BS.readFile "main.yaml"
     tUserConf <- BS.readFile "config.yaml"
 
     let config = YAML.decodeEither' $  tMainConf <> "\n" <> tUserConf
@@ -45,10 +45,10 @@ main = do
                     "vk" ->
                         VK.withHandle logger bot (cBotVK conf) $ \handle -> do
                             Logger.debug logger $ show handle
-                            _ <- VK.todo handle $ VK.State Bot.emptyUsers (VK.hServer handle) Nothing
+                            _ <- VK.run handle $ VK.State Bot.emptyUsers (VK.hServer handle) Nothing
                                 (VKTypes.startTs $ VK.hServer handle)
                             return ()
                     _ -> TG.withHandle logger bot (cBotTG conf) $ \handle -> do
                         Logger.debug logger $ show handle
-                        _ <- TG.todo handle $ TG.State Bot.emptyUsers Nothing 0
+                        _ <- TG.run handle $ TG.State Bot.emptyUsers Nothing 0
                         return ()

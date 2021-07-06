@@ -2,8 +2,7 @@
 
 # What messenger can the bot be used for
 # possible values: tg | vk
-# if undefinde or not response than tg
-startOn : tg
+startOn : vk
 
 user :
   # text showing on start
@@ -33,10 +32,8 @@ logger :
 
   # minimum level of logging data.
   # can be : Debug | Info | Warning | Error
-  # if undefinde or not response than Debug
   logMinLevel : Info
 
   # Where to output log
   # can be : LogToFile | LogToConsole
-  # if undefinde or not response than LogToConsole
   logTo : LogToConsole

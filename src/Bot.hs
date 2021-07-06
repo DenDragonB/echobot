@@ -37,6 +37,15 @@ data User  = User
 
 type Users = HashMap UID User
 
+data Exceptions
+    = ServerNotResponding -- The server is not responding
+    | FatalError String -- Other Errors with end program
+     deriving Eq
+instance Show Exceptions where
+    show ServerNotResponding = "The server is not responding"
+    show (FatalError s) = s
+
+
 emptyUsers :: Users
 emptyUsers = empty
 
