@@ -24,8 +24,6 @@ data Handle = Handle
     { hConfig :: Config
     , hBot    :: Bot.Handle
     , hLogger :: Logger.Handle
---    , offset   :: Integer
---    , response :: Maybe Response
     } deriving (Show, Eq)
 
 data State = State
@@ -35,7 +33,7 @@ data State = State
     } deriving (Show, Eq)
 
 withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO ()
-withHandle hLog hBot conf f = f $ Handle conf hBot hLog -- 0 Nothing
+withHandle hLog hBot conf f = f $ Handle conf hBot hLog
 
 setRepeat :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)
 setRepeat _ (Left err) = return $ Left err
@@ -143,9 +141,9 @@ repeatMessage handle (Right state@State {..}) = do
             let updates = filter (isJust . message) $ responseResult resp
             foldM (sender handle False True "" "ECHO") (Right state) updates
 
-sender :: Handle -> Bool -> Bool -> String -> String -> Either Bot.Exceptions State 
+sender :: Handle -> Bool -> Bool -> String -> String -> Either Bot.Exceptions State
     -> Update -> IO (Either Bot.Exceptions State)
-sender _ _ _ _ _ (Left err) _ = return $ Left err   
+sender _ _ _ _ _ (Left err) _ = return $ Left err
 sender Handle {..} kb rep textMes textLog (Right state@State {..}) UpMessge {..} = do
     case message of
         Nothing -> return $ Right state
@@ -190,4 +188,4 @@ run handle@Handle {..} state = do
         Left err -> do
             Logger.error hLogger $ show err
         Right newstate -> run handle newstate
-    
+

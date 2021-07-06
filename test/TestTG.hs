@@ -15,6 +15,18 @@ testConfig = Config
     , timeout   = 60
     }
 
+testResponse :: Response
+testResponse = Response
+    { responseOk = True
+    , responseResult = [testUpdate]
+    }
+
+testUpdate :: Update
+testUpdate = UpMessge
+    { updateId = 123
+    , message = Nothing
+    }
+
 testHandle :: Handle
 testHandle = Handle
     { hConfig  = testConfig
@@ -26,7 +38,6 @@ testHandle = Handle
             , Bot.repeatText2   = "repeat2"
             , Bot.repeatDefault = 1
             }
-        ,  Bot.users = []
         }
     , hLogger  = Logger.Handle
         { Logger.hConfig = Logger.Config
@@ -35,20 +46,13 @@ testHandle = Handle
             , Logger.logMinLevel = Logger.Debug 
             }
         }
-    , offset   = 25
+    }
+
+testState :: State
+testState = State
+    { users = Bot.emptyUsers
     , response = Just testResponse
-    }
-
-testResponse :: Response
-testResponse = Response
-    { responseOk = True
-    , responseResult = [testUpdate]
-    }
-
-testUpdate :: Update
-testUpdate = UpMessge
-    { updateId = 123
-    , message = Nothing
+    , offset   = 25
     }
 
 main :: IO ()
@@ -85,6 +89,6 @@ main = hspec $ do
                                 ] }  
     describe "TG functions" $ do
         it "delUpdate" $ do
-            let res = delUpdate testHandle 123
+            let res = delUpdate testState 123
                 mustResp = testResponse {responseResult = []}
-            res `shouldBe` testHandle {response = Just mustResp}
+            res `shouldBe` testState {response = Just mustResp}

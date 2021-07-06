@@ -35,18 +35,16 @@ main = hspec $ do
     describe "Bot functions" $ do
         it "setCommand to empty users" $ do
             let res = setCommand testUsersEmpty testUser1
-            res `shouldBe` [testUser1]
+            res `shouldBe` (insert 1 testUser1 emptyUsers)
         it "setCommand to user" $ do
             let res = setCommand testUsers testUser1 {uSentRep = True}
-            res `shouldBe`  [ User "user1" 1 1 True
-                            , User "user2" 2 1 True
-                            ]
+            res `shouldBe`  (insert 1 testUser1 {uSentRep = True} $ insert 2 testUser2 empty)
         it "setCommand to new user" $ do
             let res = setCommand testUsers testUser3
-            res `shouldBe`  [ User "user1" 1 1 False
-                            , User "user2" 2 1 True
-                            , User "user3" 3 3 True
-                            ]
+            res `shouldBe` 
+                ( insert 1 testUser1 
+                $ insert 2 testUser2 
+                $ insert 3 testUser3 empty)
         it "getCommand" $ do
             let res = getCommand testUsers 2
             res `shouldBe` True
@@ -55,15 +53,13 @@ main = hspec $ do
             res `shouldBe` False
         it "putRepeat" $ do
             let res = putRepeat testUsers testUser1 {uRep = 2}
-            res `shouldBe`  [ User "user1" 1 2 False
-                            , User "user2" 2 1 True
-                            ]
+            res `shouldBe`  (insert 1 testUser1 {uRep = 2} $ insert 2 testUser2 empty)
         it "putRepeat with new user" $ do
             let res = putRepeat testUsers testUser3
-            res `shouldBe`  [ User "user1" 1 1 False
-                            , User "user2" 2 1 True
-                            , User "user3" 3 3 True
-                            ]
+            res `shouldBe`  
+                ( insert 1 testUser1 
+                $ insert 2 testUser2 
+                $ insert 3 testUser3 empty)
         it "getRepeat" $ do
             let res = getRepeat testUsers 3 2
             res `shouldBe` 1

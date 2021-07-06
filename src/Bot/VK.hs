@@ -39,7 +39,7 @@ withHandle hLog hBot conf f = do
         Just serv -> do
             f $ Handle conf hBot hLog serv
 
-copyNewMessage :: Handle -> (Either Bot.Exceptions State) -> IO (Either Bot.Exceptions State)
+copyNewMessage :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)
 copyNewMessage _ (Left err) = return $ Left err
 copyNewMessage handle (Right state@State {..}) = do
     case response of
@@ -149,9 +149,9 @@ sendHelp handle@Handle {..} (Right state@State {..}) = do
             let helpMessage = Bot.helpText $ Bot.hConfig hBot
             foldM (sender handle False helpMessage "HELP") (Right state) needHelp
 
-sender :: Handle -> Bool -> String -> String -> Either Bot.Exceptions State -> Update 
+sender :: Handle -> Bool -> String -> String -> Either Bot.Exceptions State -> Update
     -> IO (Either Bot.Exceptions State)
-sender _ _ _ _ (Left err) _ = return $ Left err  
+sender _ _ _ _ (Left err) _ = return $ Left err
 sender Handle {..} kb textMes textLog (Right state) Update {..} = do
     case upObject of
         Nothing -> return $ Right state

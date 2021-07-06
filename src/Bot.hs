@@ -43,7 +43,7 @@ data Exceptions
      deriving Eq
 instance Show Exceptions where
     show ServerNotResponding = "The server is not responding"
-    show (FatalError s) = s
+    show (FatalError s)      = s
 
 
 emptyUsers :: Users

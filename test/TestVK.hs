@@ -12,7 +12,7 @@ import Bot.VK.Methods
 testConfig :: Config
 testConfig = Config
     { token     = "1a2bc3"
-    , groupVKId = 123
+    , groupId   = 123
     , timeout   = 25
     }
 
@@ -27,7 +27,6 @@ testHandle = Handle
             , Bot.repeatText2   = "repeat2"
             , Bot.repeatDefault = 1
             }
-        ,  Bot.users = []
         }
     , hLogger  = Logger.Handle
         { Logger.hConfig = Logger.Config
@@ -36,6 +35,16 @@ testHandle = Handle
             , Logger.logMinLevel = Logger.Debug 
             }
         }
+    , hServer = LPServer 
+        { sAddres = "serverADDR"
+        , key     = "token"
+        , startTs = "ts1"
+        }
+    }
+
+testState :: State
+testState = State
+    { users = Bot.emptyUsers
     , server   = LPServer 
         { sAddres = "serverADDR"
         , key     = "token"
@@ -151,6 +160,6 @@ main = hspec $ do
                                 ] }  
     describe "VK functions" $ do
         it "delUpdate" $ do
-            let res = delUpdate testHandle "event123"
+            let res = delUpdate testState "event123"
                 mustResp = testResponse {updates = []}
-            res `shouldBe` testHandle {response = Just mustResp}
+            res `shouldBe` testState {response = Just mustResp}
