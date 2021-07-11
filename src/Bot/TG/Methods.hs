@@ -2,6 +2,7 @@
 
 module Bot.TG.Methods where
 
+import qualified Bot
 import           Data.Aeson           (encode)
 import qualified Data.ByteString.Lazy as BSLazy (toStrict)
 import qualified Data.ByteString.UTF8 as BS
@@ -14,7 +15,7 @@ import           Bot.TG.Types
 data ReqSet = ReqSet {method :: String, reqParams :: [(BS.ByteString,Maybe BS.ByteString)]}
     deriving (Show, Eq)
 
-getResponseFromAPI :: String -> ReqSet -> IO BS.ByteString
+getResponseFromAPI :: String -> ReqSet -> IO (Either Bot.Exceptions BS.ByteString)
 getResponseFromAPI token settings = do
     let request
             = HTTPSimple.setRequestMethod (BS.fromString "GET")
@@ -25,8 +26,7 @@ getResponseFromAPI token settings = do
             $ HTTPSimple.setRequestQueryString (reqParams settings)
             $ setRequestResponseTimeout HTTP.responseTimeoutNone
             HTTPSimple.defaultRequest
-    res <- HTTPSimple.httpBS request
-    return (HTTPSimple.getResponseBody res)
+    Bot.getAnswear request
 
 setRequestResponseTimeout :: HTTP.ResponseTimeout -> HTTPSimple.Request -> HTTPSimple.Request
 setRequestResponseTimeout x req = req { HTTP.responseTimeout = x }

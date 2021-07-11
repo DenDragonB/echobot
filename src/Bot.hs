@@ -2,9 +2,14 @@
 
 module Bot where
 
-import qualified Data.Aeson          as A
-import           Data.HashMap.Strict as MAP
+import           Control.Exception
+import           Control.Monad.IO.Class
+import qualified Data.Aeson                  as A
+import qualified Data.ByteString.UTF8        as BS
+import           Data.HashMap.Strict         as MAP
 import           GHC.Generics
+import qualified Network.HTTP.Client.Conduit as HTTP
+import qualified Network.HTTP.Simple         as HTTPSimple
 
 type Token = String
 
@@ -40,10 +45,12 @@ type Users = HashMap UID User
 data Exceptions
     = ServerNotResponding -- The server is not responding
     | FatalError String -- Other Errors with end program
+    | HTTPError String -- Errors from HTTP request
      deriving Eq
 instance Show Exceptions where
     show ServerNotResponding = "The server is not responding"
     show (FatalError s)      = s
+    show (HTTPError s)       = "HTTP: " <> s
 
 
 emptyUsers :: Users
@@ -64,3 +71,20 @@ putRepeat users newUser = insert (uID newUser) newUser users
 
 getRepeat :: Users -> URep -> UID -> URep
 getRepeat users defrep uid = maybe defrep uRep (MAP.lookup uid users)
+
+getResponse :: HTTPSimple.Request -> IO BS.ByteString
+getResponse request = do
+    res <- HTTPSimple.httpBS request
+    return $ HTTPSimple.getResponseBody res
+
+getAnswear :: HTTPSimple.Request -> IO (Either Exceptions BS.ByteString)
+getAnswear req = do
+    catch (Right <$> getResponse req) $ \e -> do
+        case (e :: HTTPSimple.HttpException) of
+            HTTPSimple.InvalidUrlException url err -> return $ Left $ HTTPError
+                ("Invalid URL: " <> url <> ". reason: " <> err)
+            HTTPSimple.HttpExceptionRequest _ cont -> do
+                case cont of
+                    HTTP.ResponseTimeout -> getAnswear req
+                    HTTP.ConnectionTimeout -> getAnswear req
+                    _ -> return $ Left $ HTTPError (show cont)

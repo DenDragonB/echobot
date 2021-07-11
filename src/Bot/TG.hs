@@ -119,17 +119,20 @@ delUpdate state@State {..} uid = state {response = newResp} where
 
 getResponse :: Handle -> State -> IO (Either Bot.Exceptions State)
 getResponse Handle {..} state@State {..} = do
-    json <- getResponseFromAPI (token hConfig) $ getUpdates (timeout hConfig) offset
-    Logger.debug hLogger $ show json
-    let resp = A.decodeStrict json
-    case resp of
-        Nothing   -> return $ Right state { response = Nothing }
-        Just r -> do
-            case responseResult r of
-                [] -> return $ Right state { response = resp }
-                ups -> do
-                    let oset = 1 + updateId (last ups)
-                    return $ Right state { response = resp
+    eJson <- getResponseFromAPI (token hConfig) $ getUpdates (timeout hConfig) offset
+    Logger.debug hLogger $ show eJson
+    case eJson of
+        Left err -> return $ Left err
+        Right json -> do
+            let resp = A.decodeStrict json
+            case resp of
+                Nothing   -> return $ Right state { response = Nothing }
+                Just r -> do
+                    case responseResult r of
+                        [] -> return $ Right state { response = resp }
+                        ups -> do
+                            let oset = 1 + updateId (last ups)
+                            return $ Right state { response = resp
                                   , offset = oset}
 
 repeatMessage :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)

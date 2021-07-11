@@ -13,18 +13,19 @@ module Bot.VK.Methods
 
     ) where
 
+import qualified Bot
 import           Bot.VK.Types
-import           Data.Aeson           (encode)
-import qualified Data.ByteString.Lazy as BSLazy (toStrict)
-import qualified Data.ByteString.UTF8 as BS
-import qualified Network.HTTP.Simple  as HTTPSimple
-import qualified Network.HTTP.Client.Conduit  as HTTP
+import           Data.Aeson                  (encode)
+import qualified Data.ByteString.Lazy        as BSLazy (toStrict)
+import qualified Data.ByteString.UTF8        as BS
+import qualified Network.HTTP.Client.Conduit as HTTP
+import qualified Network.HTTP.Simple         as HTTPSimple
 
 -- Types for creating requests
 data ReqSet = ReqSet { method    :: String
                      , reqParams :: [(BS.ByteString,Maybe BS.ByteString)]} deriving (Show,Eq)
 
-getResponseFromAPI :: ReqSet -> IO BS.ByteString
+getResponseFromAPI :: ReqSet -> IO (Either Bot.Exceptions BS.ByteString)
 getResponseFromAPI settings = do
     let request
             = HTTPSimple.setRequestMethod (BS.fromString "GET")
@@ -35,19 +36,17 @@ getResponseFromAPI settings = do
             $ HTTPSimple.setRequestQueryString (reqParams settings)
             $ setRequestResponseTimeout HTTP.responseTimeoutNone
             HTTPSimple.defaultRequest
-    res <- HTTPSimple.httpBS request
-    return (HTTPSimple.getResponseBody res)
+    Bot.getAnswear request
 
 setRequestResponseTimeout :: HTTP.ResponseTimeout -> HTTPSimple.Request -> HTTPSimple.Request
 setRequestResponseTimeout x req = req { HTTP.responseTimeout = x }
 
-getUpdates :: LongPollServer -> Integer -> String -> IO BS.ByteString
+getUpdates :: LongPollServer -> Integer -> String -> IO (Either Bot.Exceptions BS.ByteString)
 getUpdates server wait ts = do
     request <- HTTP.parseRequest $
         sAddres server ++ "?act=a_check&key=" ++ key server ++
         "&ts=" ++ ts ++ "&wait=" ++ show wait
-    res <- HTTPSimple.httpBS request
-    return (HTTPSimple.getResponseBody res)
+    Bot.getAnswear request
 
 -- Methods of Telegram API
 getServer :: Config -> ReqSet

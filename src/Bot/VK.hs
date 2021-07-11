@@ -33,10 +33,10 @@ withHandle :: Logger.Handle -> Bot.Handle -> Config -> (Handle -> IO ()) -> IO (
 withHandle hLog hBot conf f = do
     respsrv <- getServerAddress conf
     case respsrv of
-        Nothing   -> do
-            Logger.error hLog "No answear from LongPoll server VK"
+        Left err   -> do
+            Logger.error hLog $ show err
             return ()
-        Just serv -> do
+        Right serv -> do
             f $ Handle conf hBot hLog serv
 
 copyNewMessage :: Handle -> Either Bot.Exceptions State -> IO (Either Bot.Exceptions State)
@@ -182,40 +182,48 @@ delUpdate state@State {..} uid = state {response = newResp} where
 
 getResponse :: Handle -> State -> IO (Either Bot.Exceptions State)
 getResponse handle@Handle {..} state@State {..} = do
-    json <- getUpdates server (timeout hConfig) offset
-    Logger.debug hLogger $ show json
-    case A.decodeStrict json of
-        Just failresp -> case failed failresp of
-            2 -> do
-                Logger.info hLogger "The key expired"
-                getNewServer handle state
-            3 -> do
-                Logger.warning hLogger "Information is lost"
-                getNewServer handle state
-            1 -> do
-                Logger.warning hLogger "The event history is outdated or has been partially lost"
-                return $ Right state {offset = fromMaybe "" $ fts failresp
+    eJson <- getUpdates server (timeout hConfig) offset
+    case eJson of
+        Left err   -> return $ Left err
+        Right json -> do
+            Logger.debug hLogger $ show json
+            case A.decodeStrict json of
+                Just failresp -> case failed failresp of
+                    2 -> do
+                        Logger.info hLogger "The key expired"
+                        getNewServer handle state
+                    3 -> do
+                        Logger.warning hLogger "Information is lost"
+                        getNewServer handle state
+                    1 -> do
+                        Logger.warning hLogger "The event history is outdated or has been partially lost"
+                        return $ Right state {offset = fromMaybe "" $ fts failresp
                              ,response = Nothing}
-            _ -> return $ Left $ Bot.FatalError "Unknown failed response from VK server"
-        Nothing -> do
-            let resp = A.decodeStrict json
-            Logger.debug hLogger $ show resp
-            case resp of
-                Nothing   -> return $ Right state { response = Nothing }
-                Just r    -> return $ Right state { response = resp
-                    , offset = ts r}
+                    _ -> return $ Left $ Bot.FatalError "Unknown failed response from VK server"
+                Nothing -> do
+                    let resp = A.decodeStrict json
+                    Logger.debug hLogger $ show resp
+                    case resp of
+                        Nothing   -> return $ Right state { response = Nothing }
+                        Just r    -> return $ Right state { response = resp
+                            , offset = ts r}
 
-getServerAddress :: Config -> IO (Maybe LongPollServer)
+getServerAddress :: Config -> IO (Either Bot.Exceptions LongPollServer)
 getServerAddress conf = do
-    json <- getResponseFromAPI $ getServer conf
-    return $ getResp <$> A.decodeStrict json
+    eJson <- getResponseFromAPI $ getServer conf
+    case eJson of
+        Left err -> return $ Left err
+        Right json -> do
+            case getResp <$> A.decodeStrict json of
+                Nothing   -> return $ Left $ Bot.FatalError "No answear from LongPoll server VK"
+                Just srv -> return $ Right srv
 
 getNewServer :: Handle -> State -> IO (Either Bot.Exceptions State)
 getNewServer Handle {..} state = do
     serv <- getServerAddress hConfig
     case serv of
-        Nothing   -> return $ Left $ Bot.FatalError "No answear from LongPoll server VK"
-        Just srv -> do
+        Left err   -> return $ Left err
+        Right srv -> do
             return $ Right state { server = srv
                         , response = Nothing
                         , offset = startTs srv}
